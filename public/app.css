@@ -1,0 +1,87 @@
+:root {
+  --bg: #f4f6f8;
+  --fg: #1d2430;
+  --muted: #5b6575;
+  --card: #ffffff;
+  --accent: #1f6feb;
+  --accent-fg: #ffffff;
+  --danger: #c62828;
+  --border: #d9dee5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161c;
+    --fg: #e8ecf1;
+    --muted: #9aa5b5;
+    --card: #1c222b;
+    --accent: #4c8dff;
+    --accent-fg: #0b1220;
+    --danger: #ef5350;
+    --border: #2e3742;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161c;
+  --fg: #e8ecf1;
+  --muted: #9aa5b5;
+  --card: #1c222b;
+  --accent: #4c8dff;
+  --accent-fg: #0b1220;
+  --danger: #ef5350;
+  --border: #2e3742;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  min-height: 44px;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+button.secondary { background: var(--card); color: var(--fg); border: 1px solid var(--border); }
+button.danger { background: var(--danger); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+/* Icon-only, round — set by theme.js on every page that includes it, so the toggle looks and
+   behaves the same everywhere regardless of that page's own button styles. */
+#theme-toggle { flex: none; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+#theme-toggle svg { width: 18px; height: 18px; }
+/* The organisation name above a page heading, set from Settings → Branding. Hidden when none is set. */
+.org-label { margin: 0 0 2px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+.org-label[hidden] { display: none; }
+/* Both icons are in the HTML and CSS picks one from the theme, so the right icon shows on first paint.
+   The moon shows in light mode (click for dark), the sun in dark mode (click for light). */
+.theme-icon-sun { display: none; }
+#theme-toggle .theme-icon-moon, #theme-toggle .theme-icon-sun { line-height: 0; }
+:root[data-theme="dark"] .theme-icon-moon { display: none; }
+:root[data-theme="dark"] .theme-icon-sun { display: inline-block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-icon-moon { display: none; }
+  :root:not([data-theme="light"]) .theme-icon-sun { display: inline-block; }
+}
+input {
+  font: inherit;
+  padding: 12px 14px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--fg);
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+}
+.muted { color: var(--muted); }
+.hidden { display: none !important; }

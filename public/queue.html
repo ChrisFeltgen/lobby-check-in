@@ -1,0 +1,1280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Queue Portal · Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="theme.js"></script>
+  <style>
+    /* Operations console: compact, restrained, and built around the lobby list. */
+    body { font-size: 15px; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+    button { font-size: 15px; min-height: 36px; padding: 6px 14px; border-radius: 8px; }
+    button.primary { background: #1f6feb; color: #fff; border: 0; font-weight: 600; }
+    button.ghost { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.55); }
+    button.secondary { font-weight: 500; }
+    button.danger { background: var(--danger); color: #fff; border: 0; }
+    .card, .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+
+    /* Header */
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: linear-gradient(90deg, #0a4670 0%, #0b6a9c 100%); color: #fff; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .logo-wrap { background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; }
+    .logo { max-height: 40px; width: auto; display: block; }
+    .top h1 { margin: 0; font-size: 22px; font-weight: 700; white-space: nowrap; }
+    .brand > div { min-width: 0; }
+    .top .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top button, .top-actions a { white-space: nowrap; }
+    /* Narrow header: the brand takes the first row and the controls drop to a full-width second
+       row, so the title never gets squeezed into a column of wrapped words. */
+    @media (max-width: 720px) {
+      .top { flex-wrap: wrap; padding: 10px 16px; }
+      .top h1 { font-size: 19px; }
+      .top .logo { max-height: 32px; }
+      .top-actions { width: 100%; justify-content: flex-end; }
+    }
+    .top .sub { margin: 2px 0 0; font-size: 14px; opacity: 0.85; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    /* Header links and buttons share one height and look: links are plain text with a highlight on hover. */
+    .top-actions a { color: #fff; text-decoration: none; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: background-color 0.12s ease; }
+    .top-actions a:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions a[aria-current="page"] { background: rgba(255, 255, 255, 0.2); }
+    .top-actions button.ghost { height: 38px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 15px; border: 1px solid rgba(255, 255, 255, 0.55); }
+    .top-actions button.ghost:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions .divider { width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.3); margin: 0 2px; }
+    .counter-btn { background: transparent; border: 0; min-height: 0; padding: 0; margin-left: 2px; color: inherit; font: inherit; font-size: 14px; opacity: 0.85; text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
+    .counter-btn:hover { opacity: 1; }
+    .counter-edit { font: inherit; font-size: 14px; margin-left: 2px; padding: 1px 6px; width: 120px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.6); background: rgba(255, 255, 255, 0.12); color: #fff; min-height: 0; }
+    .counter-edit::placeholder { color: rgba(255, 255, 255, 0.6); }
+
+    /* Sign in */
+    .login { max-width: 380px; margin: 60px auto; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+    .login label { font-size: 13px; color: var(--muted); }
+    .login input { width: 100%; }
+    .msg { min-height: 20px; margin: 0; color: var(--danger); font-size: 14px; }
+
+    /* Layout: a narrow sidebar for Service Queues, everything else in the main column beside
+       it — queues a staff member is tracking stay visible no matter how far they scroll. */
+    main { max-width: 1500px; margin: 0 auto; padding: 14px 20px 24px; }
+    .layout { display: flex; align-items: flex-start; gap: 16px; }
+    .sidebar { flex: 0 0 320px; position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; }
+    /* Restores the account's default watch list. Shown only when the list has been changed. */
+    .restore-btn { width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+    .restore-btn svg { width: 16px; height: 16px; }
+    .restore-btn:hover { color: var(--accent); border-color: var(--accent); }
+    /* Saving the watched queues as the account's default, at the foot of the sidebar. */
+    .default-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+    .default-box p { margin: 0; font-size: 13px; color: var(--muted); }
+    .default-box .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+    .panel { padding: 12px 14px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; text-transform: none; }
+    .panel-head h2 .count { font-weight: 500; color: var(--muted); }
+
+    /* Service Queues: a vertical list rather than a grid, so it reads top-to-bottom alongside
+       the main column instead of competing with it for width. Watched queues get a dot on their
+       icon and a chevron; everything else stays neutral. */
+    .qgroup-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin: 16px 0 8px; }
+    .qgroup-label:first-of-type { margin-top: 2px; }
+    .qgroup-sub { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; margin-top: 2px; }
+
+    .queue-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .qrow { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; background: var(--card); transition: border-color 0.12s ease, background-color 0.12s ease; }
+    .qrow:not(.pinned):hover, .qrow:not(.pinned):focus-visible { border-color: var(--accent); }
+    .qrow.pinned { cursor: default; }
+    .qrow.closed { background: color-mix(in srgb, var(--danger) 8%, var(--card)); border-color: var(--danger); }
+    .qrow.has-waiting:not(.watched) { border-left: 3px solid var(--accent); }
+    .qrow.has-waiting.closed { border-left-color: var(--danger); }
+
+    .qicon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--muted) 16%, var(--card)); color: var(--muted); position: relative; }
+    .qicon svg { width: 58%; height: 58%; }
+    .qrow.watched .qicon { background: color-mix(in srgb, var(--accent) 16%, var(--card)); color: var(--accent); }
+    /* The one indicator that a queue is watched: a small dot on its icon, instead of a tinted
+       card — easy to spot without the whole row competing for attention. */
+    .qrow.watched .qicon::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--card); }
+
+    .qrow-body { flex: 1; min-width: 0; }
+    /* Full name, wrapped rather than cut off to a few letters — clamped to two lines as a
+       backstop for the rare name that's still too long even wrapped. */
+    .qname { font-size: 14px; line-height: 1.25; font-weight: 600; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .qrow-meta { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; margin-top: 2px; }
+    .qcount { font-size: 15px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .qcount-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .qwait { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .qstatus { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--danger); font-weight: 600; margin-top: 2px; }
+    .qdot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex: none; }
+
+    .qrow-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+    .qcall { min-height: 26px; min-width: 26px; padding: 0; border-radius: 6px; background: var(--accent); color: #fff; border: 0; font-size: 12px; line-height: 1; }
+    .qcall:hover { filter: brightness(0.9); }
+    .qmenu-btn { min-height: 24px; width: 26px; padding: 0; font-size: 14px; border-radius: 6px; }
+    .qchevron { flex: none; color: var(--muted); display: flex; }
+    .qchevron svg { width: 16px; height: 16px; }
+
+    .qshow-all { width: 100%; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+    /* Desktop-notification toggle: same icon regardless of state, a tinted background is the
+       only thing that changes when it's on. */
+    #notify-toggle { flex: none; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--border); color: var(--muted); }
+    #notify-toggle svg { width: 18px; height: 18px; }
+    #notify-toggle.active { background: color-mix(in srgb, var(--accent) 16%, var(--card)); border-color: var(--accent); color: var(--accent); }
+
+    /* Collapsible Service Queues: the header toggles the list. Only narrow screens collapse it;
+       on wide screens the toggle is inert and the list always shows. */
+    .sidebar-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; min-height: 0; color: var(--fg); font: inherit; text-align: left; cursor: default; }
+    .sidebar-title { font-size: 15px; font-weight: 700; }
+    .sidebar-chevron { display: none; flex: none; width: 18px; height: 18px; color: var(--muted); transition: transform 0.15s ease; }
+    /* Stacking breakpoint: below this the queue list sits above the main column and collapses.
+       Above it, the side-by-side columns are wide enough for the lobby controls to stay on a row. */
+    @media (min-width: 1101px) { .sidebar-toggle { pointer-events: none; } }
+    @media (max-width: 1100px) {
+      .layout { flex-direction: column; align-items: stretch; }
+      .sidebar { flex: 1 1 auto; width: 100%; position: static; max-height: none; }
+      .sidebar-toggle { cursor: pointer; }
+      .sidebar-chevron { display: block; }
+      .sidebar.collapsed .sidebar-body { display: none; }
+      .sidebar.collapsed .sidebar-chevron { transform: rotate(-90deg); }
+    }
+
+    /* Currently being helped: every card keeps the same fixed width and wraps onto new rows as
+       the window narrows. A fill-the-column grid would resize the cards each time the number of
+       columns changed, so the cards stay one size instead. */
+    .serving-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .serving-grid > .acard { flex: 0 0 280px; }
+    /* The empty message takes the full row, so it never wraps inside a narrow box. */
+    .serving-grid .empty { flex: 1 0 100%; }
+    /* The left accent already sets this card apart, so the outer border is faint — just enough
+       to frame the card without competing with the guest's name. */
+    .acard { border: 1px solid color-mix(in srgb, var(--border) 35%, transparent); border-left: 4px solid #1f6feb; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    /* Name leads, top-left; elapsed time sits in a quiet pill opposite it. */
+    .acard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .aname { font-size: 18px; line-height: 1.25; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .elapsed { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 2px 9px 2px 7px; white-space: nowrap; }
+    .elapsed svg { width: 12px; height: 12px; }
+    /* Service and staff sit under the name as smaller, muted lines — one fact per line. */
+    /* Long service names wrap rather than truncate — the full name matters more than a tidy line. */
+    .acard-line { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.35; color: var(--muted); min-width: 0; }
+    .acard-line svg { width: 13px; height: 13px; flex: none; margin-top: 1px; }
+    .acard-line span { min-width: 0; overflow-wrap: anywhere; }
+    /* Actions sit below a faint divider. Every button is neutral; only the glyph carries its
+       meaning, so none of them pull focus from the guest. */
+    .acard-actions-row { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+    .icon-btn { min-height: 34px; width: 38px; padding: 0; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: background-color 0.1s ease; }
+    .icon-btn svg { width: 16px; height: 16px; }
+    .icon-btn:hover { background: var(--bg); }
+    /* Complete stays labeled — it's the action most tickets end with — but it's text, not a fill. */
+    .icon-btn.complete { flex: 1; width: auto; font-size: 13px; font-weight: 600; color: var(--fg); }
+    .icon-btn.complete svg { color: #166a37; }
+    .icon-btn.transfer svg { color: var(--accent); }
+    /* Neutral — undoes the call rather than destroying anything, so it stays muted. */
+    .icon-btn.requeue svg { color: var(--muted); }
+    .icon-btn.remove svg { color: var(--danger); }
+    .empty { font-size: 14px; color: var(--muted); padding: 6px 0; }
+
+    /* Lobby */
+    .lobby-title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+    .lobby-title h2 { margin: 0; font-size: 20px; font-weight: 700; }
+    .lobby-title h2 .count { font-weight: 500; color: var(--muted); }
+    .oldest { font-size: 15px; color: var(--muted); }
+    .oldest strong { color: var(--fg); font-weight: 700; }
+    .lobby-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .lobby-tools button { white-space: nowrap; }
+    /* Lobby header adapts to the panel's own width, not the window's. Wide: one row, title left
+       and controls right. Narrow: title on top, then a tidy grid — the segmented control full
+       width, Add customer and Call next sharing the row beneath it. */
+    .lobby-panel { container: lobby / inline-size; }
+    @container lobby (max-width: 879px) {
+      .lobby-head { flex-direction: column; align-items: stretch; }
+      /* Segmented control takes the full width; the two actions keep their natural size, with
+         Add customer on the left and Call next pushed to the right. */
+      .lobby-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+      .lobby-tools .segmented { flex: 1 1 100%; display: flex; }
+      .lobby-tools .segmented button { flex: 1; min-width: 0; padding: 6px 8px; white-space: normal; line-height: 1.2; }
+      .lobby-tools #call-next { margin-left: auto; }
+    }
+    .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .segmented button { border: 0; border-radius: 0; background: var(--card); color: var(--fg); font-weight: 500; min-height: 36px; }
+    .segmented button.active { background: #0a4670; color: #fff; font-weight: 600; }
+    .lobby-tools select { min-height: 36px; padding: 4px 8px; border-radius: 8px; }
+    .table-wrap { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--bg); }
+    td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    td.num { color: var(--muted); width: 40px; }
+    td.tno-cell { font-weight: 700; white-space: nowrap; }
+    td.actions { white-space: nowrap; text-align: right; }
+    td.actions button.call { min-width: 92px; background: #1f6feb; color: #fff; border: 0; font-weight: 600; }
+    .wait-mid { color: #d97706; font-weight: 700; }
+    .wait-long { color: #c62828; font-weight: 700; }
+
+    /* Overflow menus */
+    .menu-btn { min-height: 32px; width: 36px; padding: 0; font-size: 18px; line-height: 1; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; }
+    .menu { position: absolute; z-index: 20; min-width: 200px; max-width: 280px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .menu-info { margin: 6px 8px; font-size: 14px; line-height: 1.4; white-space: normal; }
+    .menu button.menu-item { display: block; width: 100%; text-align: left; background: transparent; color: var(--fg); border: 0; border-radius: 6px; padding: 10px 12px; min-height: 40px; font-size: 15px; font-weight: 500; }
+    .menu button.menu-item:hover { background: var(--bg); }
+    .menu button.menu-item.is-danger { color: var(--danger); font-weight: 600; margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0 0 6px 6px; }
+
+    /* Transfer dialog */
+    .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .dialog { padding: 18px; width: min(480px, 92vw); display: flex; flex-direction: column; gap: 12px; }
+    .dialog h3 { margin: 0; font-size: 18px; }
+    .transfer-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .transfer-btn { min-height: 48px; text-align: left; }
+
+    .dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+    .dialog input, .dialog select { min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); }
+    .dialog .appt-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .dialog .err { margin: 0; min-height: 18px; font-size: 14px; color: var(--danger); }
+    .dialog .actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* Responsive — the queue rows reflow on their own via auto-fill; only the serving grid
+       needs explicit breakpoints. */
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <div>
+        <p class="org-label" data-org-name hidden></p>
+        <h1>Lobby Check-In</h1>
+        <p class="sub">
+          <span id="signed-in"></span>
+          <button id="counter-display" class="counter-btn hidden" type="button"></button>
+          <input id="counter-edit" class="counter-edit hidden" maxlength="20" autocomplete="off">
+        </p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a href="queue.html" aria-current="page">Queue Portal</a>
+      <a id="manage-link" class="hidden" href="manage.html">Management</a>
+      <a href="account.html">My account</a>
+      <button id="signout" class="ghost hidden" type="button">Sign out</button>
+      <span class="divider"></span>
+      <button id="theme-toggle" class="ghost" type="button"><span class="theme-icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="theme-icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="5"/></svg></span></button>
+    </div>
+  </header>
+
+  <main id="dashboard" class="hidden">
+    <div class="layout">
+      <!-- Starts collapsed: on narrow screens the queue list is folded away so the lobby sits right
+           below. On wide screens the collapse rules don't apply and the list is always shown. -->
+      <aside class="sidebar panel collapsed" id="sidebar">
+        <div class="panel-head">
+          <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-expanded="false" aria-controls="sidebar-body">
+            <span class="sidebar-title">Service Queues</span>
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button id="restore-default" class="restore-btn hidden" type="button" title="Restore my default queues" aria-label="Restore my default queues"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+          <button id="notify-toggle" class="hidden" type="button"></button>
+        </div>
+        <div class="sidebar-body" id="sidebar-body">
+          <div class="qgroup-label hidden" id="watched-label">Your Watched Queues</div>
+          <div class="queue-list" id="watched-row"></div>
+          <div class="qgroup-label hidden" id="other-label">Other Services</div>
+          <div class="queue-list" id="other-row"></div>
+          <button class="secondary qshow-all hidden" id="show-all-btn" type="button"></button>
+          <div class="default-box" id="default-box">
+            <p id="default-status"></p>
+            <div class="row">
+              <button class="secondary" id="save-default" type="button">Save as my default</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="main-col">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Currently Being Helped</h2>
+            <span class="muted" style="font-size:13px" id="updated"></span>
+          </div>
+          <div class="serving-grid" id="serving-grid"></div>
+        </section>
+
+        <section class="panel lobby-panel">
+          <div class="panel-head lobby-head">
+            <div class="lobby-title">
+              <h2>Waiting in Lobby</h2>
+              <span class="oldest">Oldest wait: <strong id="oldest">—</strong></span>
+            </div>
+            <div class="lobby-tools">
+              <div class="segmented" id="scope">
+                <button type="button" class="active" data-scope="watched">My Watched Queues</button>
+                <button type="button" data-scope="all">All Lobby Customers</button>
+              </div>
+              <button class="secondary" id="add-customer" type="button">Add customer</button>
+              <button class="primary" id="call-next" type="button">Call next</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>#</th><th>Name</th><th>Service</th><th>Wait Time</th><th>Appointment</th><th></th></tr>
+              </thead>
+              <tbody id="lobby-body"></tbody>
+            </table>
+          </div>
+          <p class="empty hidden" id="lobby-empty"></p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Completed Today <span class="count" id="history-count"></span></h2>
+            <button class="secondary" id="history-toggle" type="button">Show</button>
+          </div>
+          <div class="table-wrap hidden" id="history-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Service</th><th>Assisted by</th><th>Called</th><th>Completed</th><th>Appointment</th></tr></thead>
+              <tbody id="history-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="msg" id="msg"></p>
+      </div>
+    </div>
+  </main>
+
+  <div id="menu" class="menu hidden"></div>
+
+  <script src="socket.io/socket.io.js"></script>
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      // Appointments always has someone due any minute, so it stays pinned to Your Watched
+      // Queues — unlike every other queue, it can't be unwatched.
+      var PINNED_CODE = 'AC';
+      var state = {
+        user: null,          // { id, username, displayName, role } once signed in
+        counter: localStorage.getItem('staffCounter') || '',
+        queue: [],
+        watched: null,      // null means every queue is watched until the staff member edits the list
+        hideOther: false,   // collapses the Other Services section out of the way entirely
+        scope: 'watched',
+        notifyEnabled: false, // desktop notification when someone joins a watched queue
+      };
+
+      function $(id) { return document.getElementById(id); }
+
+      function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      }
+
+      // The session lives in an HttpOnly cookie, sent automatically with same-origin requests.
+      async function api(path, opts) {
+        opts = opts || {};
+        var headers = { 'Content-Type': 'application/json' };
+        var res = await fetch(BASE + path.replace(/^\//, ''), { method: opts.method || 'GET', headers: headers, body: opts.body, credentials: 'same-origin' });
+        if (res.status === 401 && state.user) { state.user = null; showLogin(); }
+        var data = await res.json().catch(function () { return {}; });
+        // A forced password change stops every action until it's done.
+        if (data.code === 'PASSWORD_CHANGE_REQUIRED') { window.location.href = BASE + 'account.html'; throw new Error(data.error); }
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      }
+
+      function showMsg(text) { $('msg').textContent = text || ''; }
+
+      function nameOf(code) {
+        var s = state.queue.find(function (q) { return q.code === code; });
+        return s ? s.name : code;
+      }
+
+      function minutesSince(iso) {
+        return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+      }
+
+      function waitText(m) { return m < 1 ? '< 1 min' : m + ' min'; }
+
+      // Wait colour is used sparingly: orange for moderate waits, red only for long ones.
+      function waitClass(m) { return m >= 12 ? 'wait-long' : m >= 6 ? 'wait-mid' : ''; }
+
+      // How long the longest-waiting person in this one queue has been waiting — null if
+      // nobody is.
+      function longestWaitMinutes(svc) {
+        if (!svc.waiting.length) return null;
+        return Math.max.apply(null, svc.waiting.map(function (t) { return minutesSince(t.createdAt); }));
+      }
+
+      function watchedCodes() {
+        var all = state.queue.map(function (s) { return s.code; });
+        if (!state.watched) return all;
+        var codes = all.filter(function (c) { return state.watched.indexOf(c) >= 0; });
+        // Pinned regardless of what's saved — covers old saved lists from before this existed.
+        if (all.indexOf(PINNED_CODE) >= 0 && codes.indexOf(PINNED_CODE) < 0) codes.push(PINNED_CODE);
+        return codes;
+      }
+
+      function loadWatched() {
+        try {
+          var v = JSON.parse(localStorage.getItem('staffWatched'));
+          state.watched = Array.isArray(v) ? v : null;
+        } catch (e) { state.watched = null; }
+      }
+
+      function setWatched(list) {
+        state.watched = list;
+        try { localStorage.setItem('staffWatched', JSON.stringify(list)); } catch (e) { /* storage unavailable: applies for this session */ }
+        render();
+      }
+
+      // The saved default is applied at sign-in, so the watch list follows the account to any computer.
+      // Changes made during a session stay on this computer until the next sign-in.
+      function applyDefaultQueues() {
+        var saved = state.user && state.user.defaultQueues;
+        if (!Array.isArray(saved)) return;
+        state.watched = saved.slice();
+        try { localStorage.setItem('staffWatched', JSON.stringify(saved)); } catch (e) { /* storage unavailable: applies for this session */ }
+      }
+
+      // The restore icon shows only when the watch list differs from the saved default (or from watching
+      // every queue, when no default is saved). Clicking it puts the default back for this session.
+      function renderRestoreButton() {
+        var all = state.queue.map(function (q) { return q.code; });
+        function normalize(list) {
+          var codes = list ? list.filter(function (c) { return all.indexOf(c) >= 0; }) : all.slice();
+          if (all.indexOf(PINNED_CODE) >= 0 && codes.indexOf(PINNED_CODE) < 0) codes.push(PINNED_CODE);
+          return codes.sort().join(',');
+        }
+        var saved = state.user && Array.isArray(state.user.defaultQueues) ? state.user.defaultQueues : null;
+        var differs = normalize(state.watched) !== normalize(saved);
+        $('restore-default').classList.toggle('hidden', !state.user || !differs);
+      }
+
+      function restoreDefaults() {
+        var saved = state.user && Array.isArray(state.user.defaultQueues) ? state.user.defaultQueues : null;
+        setWatched(saved ? saved.slice() : null);
+      }
+
+      // Shown only until a default is saved. Once there is one, it's managed on My account, so this
+      // box goes away. An error from saving is the one time it stays visible after a default exists.
+      function renderDefaultBox(error) {
+        var saved = state.user && Array.isArray(state.user.defaultQueues);
+        $('default-box').classList.toggle('hidden', !!saved && !error);
+        $('default-status').textContent = error || 'No default saved. Save the queues you watch to use them on any computer.';
+      }
+
+      async function saveDefault() {
+        $('save-default').disabled = true;
+        try {
+          var result = await api('/api/account/default-queues', { method: 'PUT', body: JSON.stringify({ codes: watchedCodes() }) });
+          state.user.defaultQueues = result.defaultQueues;
+          renderDefaultBox();
+        } catch (err) {
+          renderDefaultBox(err.message);
+        } finally {
+          $('save-default').disabled = false;
+        }
+      }
+
+      function toggleWatch(code) {
+        if (code === PINNED_CODE) return;
+        var w = watchedCodes().slice();
+        var i = w.indexOf(code);
+        if (i >= 0) w.splice(i, 1); else w.push(code);
+        setWatched(w);
+      }
+
+      // Other Services can be collapsed out of the way entirely, for a staff member who only
+      // ever cares about their own watched queues — remembered per device, like the watch list.
+      function loadHideOther() {
+        state.hideOther = localStorage.getItem('staffHideOther') === '1';
+      }
+
+      function setHideOther(hide) {
+        state.hideOther = hide;
+        try { localStorage.setItem('staffHideOther', hide ? '1' : '0'); } catch (e) { /* storage unavailable: applies for this session */ }
+        render();
+      }
+
+      // ---- Overflow menus ----
+      function closeMenu() { $('menu').classList.add('hidden'); $('menu').textContent = ''; }
+
+      // A small popover showing one piece of text — used for the closure reason, so a long
+      // message doesn't stretch the queue tile's fixed-height grid layout.
+      function openInfo(anchor, text) {
+        var menu = $('menu');
+        menu.textContent = '';
+        menu.appendChild(el('p', 'menu-info', text));
+        var r = anchor.getBoundingClientRect();
+        menu.style.top = (r.bottom + window.scrollY + 4) + 'px';
+        menu.classList.remove('hidden');
+        menu.style.left = (r.right + window.scrollX - menu.offsetWidth) + 'px';
+      }
+
+      function openMenu(anchor, items) {
+        var menu = $('menu');
+        menu.textContent = '';
+        items.forEach(function (item) {
+          var b = el('button', 'menu-item' + (item.danger ? ' is-danger' : ''), item.label);
+          b.type = 'button';
+          // Stop this click from reaching the document-level "click outside closes the menu"
+          // listener below — otherwise an item whose run() reopens the same #menu element (the
+          // closed-queue menu's "Why closed?" does, via openInfo) gets closed again immediately,
+          // racing against its own freshly-rendered content.
+          b.addEventListener('click', function (e) { e.stopPropagation(); closeMenu(); item.run(); });
+          menu.appendChild(b);
+        });
+        var r = anchor.getBoundingClientRect();
+        menu.style.top = (r.bottom + window.scrollY + 4) + 'px';
+        menu.classList.remove('hidden');
+        menu.style.left = (r.right + window.scrollX - menu.offsetWidth) + 'px';
+      }
+
+      document.addEventListener('click', function (e) {
+        if (!$('menu').contains(e.target) && !(e.target.classList && e.target.classList.contains('menu-btn'))) closeMenu();
+      });
+
+      // ---- Actions ----
+      function ticketAction(t, action) {
+        if (action === 'remove' && !confirm('Remove ' + t.customerName + ' from the queue?')) return;
+        showMsg('');
+        api('/api/staff/tickets/' + t.id + '/' + action, { method: 'POST' })
+          .then(refresh)
+          .catch(function (err) { showMsg(err.message); });
+      }
+
+      function callTicket(t) {
+        showMsg('');
+        api('/api/staff/tickets/' + t.id + '/call', { method: 'POST', body: JSON.stringify({ counter: state.counter }) })
+          .then(refresh)
+          .catch(function (err) { showMsg(err.message); refresh(); });
+      }
+
+      // Icons for the always-visible Complete / Transfer / Remove buttons on each helped card.
+      var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+      // A left-right swap, not a circular arrow — Return to queue already owns the "circular
+      // undo" shape below, and the two looked too similar to tell apart at a glance.
+      var ICON_TRANSFER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4"/><path d="M3 8h13"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8"/></svg>';
+      var ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+      // A proper undo arrow: one continuous curve into a clear chevron tip, not two paths that
+      // only approximately line up.
+      var ICON_RETURN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
+      var ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+      var ICON_PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+
+      // One icon per service, same set used on the queue monitor — same shape language for the
+      // same service, wherever it shows up in the app.
+      var ICON_PATHS = {
+        BPI: '<path d="M6 22V4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v18Z"/><path d="M14 9h4a1 1 0 0 1 1 1v12"/><path d="M10 9h.01M10 13h.01M10 17h.01"/><path d="M2 22h20"/>',
+        BSC: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+        CR: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+        CE: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+        BTD: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+        UF: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+        ZD: '<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894L8.106 3.447a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15.236"/><path d="M9 3.764v15.236"/>',
+        LS: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="m18.5 19.5 2 2"/>',
+        AB: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+        AC: '<path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
+      };
+      function svgIcon(inner) {
+        var wrap = document.createElement('span');
+        wrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+        return wrap.firstChild;
+      }
+      function iconFor(code) { return svgIcon(ICON_PATHS[code] || ICON_PATHS.AC); }
+
+      // Calls the first (longest-waiting) customer in one queue, regardless of watch state.
+      function quickCallNext(svc) {
+        var first = svc.waiting[0];
+        if (!first) return;
+        callTicket(first);
+      }
+
+      // ---- Desktop notifications: someone joined a watched queue ----
+      var NOTIFY_KEY = 'staffNotify';
+      var NOTIFY_MS = 6000; // how long an arrival alert stays up before closing itself
+      var ICON_BELL = '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>';
+
+      function loadNotifyPref() {
+        state.notifyEnabled = localStorage.getItem(NOTIFY_KEY) === '1' &&
+          typeof Notification !== 'undefined' && Notification.permission === 'granted';
+      }
+
+      function renderNotifyToggle() {
+        var btn = $('notify-toggle');
+        if (typeof Notification === 'undefined') { btn.classList.add('hidden'); return; }
+        btn.classList.remove('hidden');
+        btn.classList.toggle('active', state.notifyEnabled);
+        btn.setAttribute('aria-pressed', String(state.notifyEnabled));
+        btn.title = state.notifyEnabled
+          ? 'Desktop notifications on for watched queues — click to turn off'
+          : 'Turn on desktop notifications when someone joins a watched queue';
+      }
+
+      // Diffs each refresh's waiting lists against the previous one and notifies for any new
+      // arrival in a watched queue. The very first call just establishes the baseline — nobody
+      // wants a flood of notifications for people already waiting when the page loads.
+      var knownWaitingIds = null;
+      function checkNewArrivals(services) {
+        var watched = watchedCodes();
+        var watchedSet = {};
+        watched.forEach(function (c) { watchedSet[c] = true; });
+
+        var currentIds = {};
+        services.forEach(function (svc) {
+          svc.waiting.forEach(function (t) { currentIds[t.id] = { svc: svc, t: t }; });
+        });
+
+        var canNotify = state.notifyEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+        if (knownWaitingIds !== null && canNotify) {
+          Object.keys(currentIds).forEach(function (id) {
+            if (knownWaitingIds[id]) return;
+            var entry = currentIds[id];
+            if (watchedSet[entry.svc.code]) notifyNewArrival(entry.svc, entry.t);
+          });
+        }
+        knownWaitingIds = currentIds;
+      }
+
+      function notifyNewArrival(svc, t) {
+        try {
+          // Position in line is the customer's place among those still waiting for this service.
+          var position = svc.waiting.findIndex(function (w) { return w.id === t.id; }) + 1;
+          var n = new Notification('New check-in: ' + t.customerName, {
+            body: svc.name + (position ? '\nPosition ' + position + ' in line' : ''),
+            tag: 'queue-arrival-' + t.id,
+            icon: BASE + 'images/notification-icon.png',
+            silent: false
+          });
+          // Temporary: closes on its own after a few seconds, so it never waits to be dismissed.
+          var closeTimer = setTimeout(function () { n.close(); }, NOTIFY_MS);
+          n.onclick = function () { clearTimeout(closeTimer); window.focus(); n.close(); };
+        } catch (e) { /* notifications unavailable in this browser: fail silently */ }
+      }
+
+      $('notify-toggle').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON_BELL + '</svg>';
+      // Narrow screens only: folds the queue list away or back out. Harmless on wide screens,
+      // where the toggle ignores clicks and the list is always visible.
+      $('sidebar-toggle').addEventListener('click', function () {
+        var collapsed = $('sidebar').classList.toggle('collapsed');
+        this.setAttribute('aria-expanded', String(!collapsed));
+      });
+
+      $('notify-toggle').addEventListener('click', function () {
+        if (state.notifyEnabled) {
+          state.notifyEnabled = false;
+          localStorage.setItem(NOTIFY_KEY, '0');
+          renderNotifyToggle();
+          return;
+        }
+        if (typeof Notification === 'undefined') return;
+        if (Notification.permission === 'denied') {
+          alert('Desktop notifications are blocked for this site. Allow them from your browser\'s site settings, then try again.');
+          return;
+        }
+        if (Notification.permission === 'granted') {
+          state.notifyEnabled = true;
+          localStorage.setItem(NOTIFY_KEY, '1');
+          renderNotifyToggle();
+          return;
+        }
+        Notification.requestPermission().then(function (perm) {
+          if (perm === 'granted') {
+            state.notifyEnabled = true;
+            localStorage.setItem(NOTIFY_KEY, '1');
+          }
+          renderNotifyToggle();
+        });
+      });
+
+      // Forces a closed queue back open, overriding whatever is closing it right now (manual or
+      // scheduled). This only clears the current closure — the server caps it at the end of
+      // today's scheduled window, if any, so the queue still auto-closes next time its schedule
+      // triggers rather than staying force-open indefinitely.
+      function reopenService(code, name) {
+        if (!confirm('Reopen ' + name + '? This clears the current closure only — it will close again automatically the next time a scheduled closure starts.')) return;
+        showMsg('');
+        api('/api/services/' + code + '/override', { method: 'PATCH', body: JSON.stringify({ override: 'open' }) })
+          .then(refresh)
+          .catch(function (err) { showMsg(err.message); });
+      }
+
+      // Adds a customer from this station. Uses the same check-in as the kiosk.
+      var APPOINTMENT_CODE = 'AC';
+
+      function appointmentTimes() {
+        var out = [];
+        for (var mins = 7 * 60; mins <= 17 * 60 + 30; mins += 30) {
+          var h = Math.floor(mins / 60), m = mins % 60;
+          out.push(((h + 11) % 12 + 1) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'));
+        }
+        return out;
+      }
+
+      function labelled(text, control) {
+        var l = el('label');
+        l.appendChild(el('span', null, text));
+        l.appendChild(control);
+        return l;
+      }
+
+      function openAddCustomer() {
+        closeMenu();
+        var overlay = el('div', 'overlay');
+        var form = el('form', 'dialog card');
+        form.appendChild(el('h3', null, 'Add customer to a queue'));
+
+        var serviceSel = document.createElement('select');
+        // Alphabetical by name, sorted on a copy so state.queue keeps the server's order.
+        state.queue.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (s) {
+          var o = el('option', null, s.name);
+          o.value = s.code;
+          serviceSel.appendChild(o);
+        });
+        form.appendChild(labelled('Queue', serviceSel));
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.maxLength = 60;
+        nameInput.required = true;
+        nameInput.autocomplete = 'off';
+        form.appendChild(labelled('Customer name', nameInput));
+
+        var withInput = document.createElement('input');
+        withInput.type = 'text';
+        withInput.maxLength = 100;
+        withInput.autocomplete = 'off';
+        var timeSel = document.createElement('select');
+        var placeholder = el('option', null, 'Choose a time');
+        placeholder.value = '';
+        timeSel.appendChild(placeholder);
+        appointmentTimes().forEach(function (t) {
+          var o = el('option', null, t);
+          o.value = t;
+          timeSel.appendChild(o);
+        });
+        var apptFields = el('div', 'appt-fields');
+        apptFields.appendChild(labelled('Appointment with', withInput));
+        apptFields.appendChild(labelled('Appointment time', timeSel));
+        form.appendChild(apptFields);
+
+        function syncAppt() { apptFields.classList.toggle('hidden', serviceSel.value !== APPOINTMENT_CODE); }
+        serviceSel.addEventListener('change', syncAppt);
+        syncAppt();
+
+        var err = el('p', 'err');
+        form.appendChild(err);
+
+        var actions = el('div', 'actions');
+        var cancel = el('button', 'secondary', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', function () { overlay.remove(); });
+        var add = el('button', 'primary', 'Add to queue');
+        add.type = 'submit';
+        actions.appendChild(cancel);
+        actions.appendChild(add);
+        form.appendChild(actions);
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          err.textContent = '';
+          var body = { serviceId: serviceSel.value, name: nameInput.value.trim() };
+          if (!body.name) { err.textContent = 'Enter the customer name.'; return; }
+          if (serviceSel.value === APPOINTMENT_CODE) {
+            body.appointment = { with: withInput.value.trim(), time: timeSel.value };
+            if (!body.appointment.with) { err.textContent = 'Enter who the customer is seeing.'; return; }
+            if (!body.appointment.time) { err.textContent = 'Choose the appointment time.'; return; }
+          }
+          add.disabled = true;
+          api('/api/tickets', { method: 'POST', body: JSON.stringify(body) })
+            .then(function () { overlay.remove(); refresh(); })
+            .catch(function (error) { err.textContent = error.message; add.disabled = false; });
+        });
+
+        overlay.appendChild(form);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+        nameInput.focus();
+      }
+
+      // Picks another queue for the customer. The list leaves out the queue they are already in.
+      function openTransfer(t) {
+        closeMenu();
+        var overlay = el('div', 'overlay');
+        var dialog = el('div', 'dialog card');
+        dialog.appendChild(el('h3', null, 'Transfer ' + t.customerName + ' to:'));
+        var list = el('div', 'transfer-list');
+        state.queue.filter(function (s) { return s.code !== t.serviceCode; }).forEach(function (s) {
+          var b = el('button', 'secondary transfer-btn', s.name);
+          b.type = 'button';
+          b.addEventListener('click', function () { overlay.remove(); doTransfer(t, s.code); });
+          list.appendChild(b);
+        });
+        dialog.appendChild(list);
+        var cancel = el('button', 'secondary', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', function () { overlay.remove(); });
+        dialog.appendChild(cancel);
+        overlay.appendChild(dialog);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+      }
+
+      function doTransfer(t, serviceCode) {
+        showMsg('');
+        api('/api/staff/tickets/' + t.id + '/transfer', { method: 'POST', body: JSON.stringify({ serviceId: serviceCode }) })
+          .then(refresh)
+          .catch(function (err) { showMsg(err.message); });
+      }
+
+      // ---- Rendering ----
+      var ICON_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+
+      // Closed-queue reason/reopen actions, tucked behind a small menu button instead of sitting
+      // inline — keeps the row compact regardless of how long the reason text is. Open is the
+      // implied default, so this only renders anything when a queue is actually closed.
+      function queueStatusRow(svc) {
+        if (svc.available) return null;
+        var row = el('div', 'qstatus');
+        row.appendChild(el('span', 'qdot'));
+        row.appendChild(document.createTextNode('Closed'));
+        var menuBtn = el('button', 'menu-btn qmenu-btn', '⋯');
+        menuBtn.type = 'button';
+        menuBtn.title = 'Closed options';
+        menuBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var items = [{ label: 'Why closed?', run: function () { openInfo(menuBtn, svc.unavailableMessage); } }];
+          // The fast path: Managers and Admins can force a queue back open right from here.
+          // Full control (setting the message, or recurring schedules) lives on Management.
+          if (state.user && state.user.role !== 'staff') {
+            items.push({ label: 'Reopen', run: function () { reopenService(svc.code, svc.name); } });
+          }
+          openMenu(menuBtn, items);
+        });
+        row.appendChild(menuBtn);
+        return row;
+      }
+
+      // One row in the sidebar list, shared by both watched and unwatched services — only the
+      // class names, the chevron, and the click behavior differ between them.
+      function queueRow(svc, opts) {
+        var pinned = opts.watched && svc.code === PINNED_CODE;
+        var hasWaiting = svc.waiting.length > 0;
+        var cls = 'qrow' + (opts.watched ? ' watched' : '') + (!svc.available ? ' closed' : '') + (hasWaiting ? ' has-waiting' : '') + (pinned ? ' pinned' : '');
+        var row = el('div', cls);
+        if (!pinned) {
+          row.setAttribute('role', 'button');
+          row.setAttribute('tabindex', '0');
+          row.setAttribute('aria-pressed', String(!!opts.watched));
+          row.title = opts.watched ? 'Click to stop watching this queue' : 'Click to watch this queue';
+        } else {
+          row.title = 'Always watched';
+        }
+
+        var iconWrap = el('span', 'qicon');
+        iconWrap.appendChild(iconFor(svc.code));
+        row.appendChild(iconWrap);
+
+        var body = el('div', 'qrow-body');
+        body.appendChild(el('div', 'qname', svc.name));
+        var meta = el('div', 'qrow-meta');
+        meta.appendChild(el('span', 'qcount', String(svc.waiting.length)));
+        meta.appendChild(el('span', 'qcount-label', 'waiting'));
+        var longestWait = longestWaitMinutes(svc);
+        if (longestWait !== null) {
+          meta.appendChild(el('span', 'qwait ' + waitClass(longestWait), '· Longest ' + waitText(longestWait)));
+        }
+        body.appendChild(meta);
+        var status = queueStatusRow(svc);
+        if (status) body.appendChild(status);
+        row.appendChild(body);
+
+        var actions = el('div', 'qrow-actions');
+        if (hasWaiting && svc.available) {
+          var mini = el('button', 'qcall', '▶');
+          mini.type = 'button';
+          mini.title = 'Call next in ' + svc.name;
+          mini.addEventListener('click', function (e) { e.stopPropagation(); quickCallNext(svc); });
+          actions.appendChild(mini);
+        }
+        if (opts.watched && !pinned) {
+          var chevron = el('span', 'qchevron');
+          chevron.innerHTML = ICON_CHEVRON;
+          actions.appendChild(chevron);
+        }
+        if (actions.childNodes.length) row.appendChild(actions);
+
+        if (!pinned) {
+          row.addEventListener('click', function () { toggleWatch(svc.code); });
+          row.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleWatch(svc.code); }
+          });
+        }
+        return row;
+      }
+
+      // Watched queues lead, in their own section; everything else follows, with unwatched
+      // queues that actually have people waiting pulled to the front — those need attention
+      // soonest, even though nobody's watching them yet.
+      function renderQueueRow() {
+        var watched = watchedCodes();
+        var watchedSet = {};
+        watched.forEach(function (c) { watchedSet[c] = true; });
+
+        var watchedSvcs = state.queue.filter(function (s) { return watchedSet[s.code]; });
+        var otherSvcs = state.queue.filter(function (s) { return !watchedSet[s.code]; });
+        otherSvcs.sort(function (a, b) { return (b.waiting.length > 0) - (a.waiting.length > 0); });
+
+        // Appointments is always watched, but it's a card worth taking up space for only once
+        // someone's actually in it — an empty one just sits there otherwise.
+        var watchedDisplay = watchedSvcs.filter(function (s) {
+          return s.code !== PINNED_CODE || s.waiting.length > 0 || !s.available;
+        });
+        // Appointments leads the list — it's always watched, and someone's due any minute.
+        // Everything else is alphabetical, so the list stays predictable as queues move in and
+        // out of it.
+        watchedDisplay.sort(function (a, b) {
+          var pinnedDiff = (b.code === PINNED_CODE) - (a.code === PINNED_CODE);
+          return pinnedDiff || a.name.localeCompare(b.name);
+        });
+
+        var watchedBox = $('watched-row');
+        watchedBox.textContent = '';
+        watchedDisplay.forEach(function (svc) { watchedBox.appendChild(queueRow(svc, { watched: true })); });
+        $('watched-label').classList.toggle('hidden', !watchedDisplay.length);
+        watchedBox.classList.toggle('hidden', !watchedDisplay.length);
+
+        var otherBox = $('other-row');
+        otherBox.textContent = '';
+        otherSvcs.forEach(function (svc) { otherBox.appendChild(queueRow(svc, { watched: false })); });
+        var otherLabel = $('other-label');
+        otherLabel.textContent = '';
+        otherLabel.appendChild(document.createTextNode('Other Services'));
+        otherLabel.appendChild(el('span', 'qgroup-sub', otherSvcs.length + (otherSvcs.length === 1 ? ' queue' : ' queues') + ' not being watched'));
+        otherLabel.classList.toggle('hidden', !otherSvcs.length);
+        otherBox.classList.toggle('hidden', !otherSvcs.length || state.hideOther);
+
+        // A full-width button at the bottom of the sidebar, rather than a small link up top, so
+        // it reads as a deliberate action alongside the list instead of being easy to miss.
+        var showAllBtn = $('show-all-btn');
+        if (otherSvcs.length) {
+          showAllBtn.classList.remove('hidden');
+          showAllBtn.textContent = state.hideOther ? 'Show all services' : 'Hide other services';
+        } else {
+          showAllBtn.classList.add('hidden');
+        }
+        renderDefaultBox();
+        renderRestoreButton();
+      }
+
+      function renderServing() {
+        var rows = [];
+        state.queue.forEach(function (svc) {
+          svc.serving.forEach(function (t) { rows.push(t); });
+        });
+        rows.sort(function (a, b) { return new Date(a.calledAt) - new Date(b.calledAt); });
+
+        var grid = $('serving-grid');
+        grid.textContent = '';
+        if (!rows.length) {
+          grid.appendChild(el('div', 'empty', 'No one is being helped right now.'));
+          return;
+        }
+        rows.forEach(function (t) {
+          var card = el('div', 'acard');
+
+          // Name leads, top-left, sized down a touch to make room; elapsed time moves into a
+          // quiet pill opposite it instead of plain text competing on the same line.
+          var head = el('div', 'acard-head');
+          head.appendChild(el('span', 'aname', t.customerName));
+          var elapsed = el('span', 'elapsed');
+          elapsed.innerHTML = ICON_CLOCK;
+          elapsed.appendChild(document.createTextNode(waitText(minutesSince(t.calledAt))));
+          head.appendChild(elapsed);
+          card.appendChild(head);
+
+          var svcLine = el('div', 'acard-line');
+          svcLine.innerHTML = iconFor(t.serviceCode).outerHTML;
+          svcLine.appendChild(el('span', null, nameOf(t.serviceCode)));
+          card.appendChild(svcLine);
+          if (t.appointmentWith) card.appendChild(el('div', 'acard-line', 'Appointment with ' + t.appointmentWith + ' at ' + t.appointmentTime));
+          // Who is helping them, and where — "Jane Doe · Window 1". Falls back gracefully for
+          // any ticket called before staff accounts tracked this.
+          var who = [t.calledBy, t.counter].filter(Boolean).join(' · ') || '—';
+          var staffLine = el('div', 'acard-line');
+          staffLine.innerHTML = ICON_PERSON;
+          staffLine.appendChild(el('span', null, who));
+          card.appendChild(staffLine);
+
+          var actions = el('div', 'acard-actions-row');
+          var complete = el('button', 'icon-btn complete', '');
+          complete.type = 'button';
+          complete.title = 'Complete';
+          complete.innerHTML = ICON_CHECK + '<span>Complete</span>';
+          complete.addEventListener('click', function (e) { e.stopPropagation(); ticketAction(t, 'complete'); });
+          var transfer = el('button', 'icon-btn transfer', '');
+          transfer.type = 'button';
+          transfer.title = 'Reassign';
+          transfer.innerHTML = ICON_TRANSFER;
+          transfer.addEventListener('click', function (e) { e.stopPropagation(); openTransfer(t); });
+          var requeue = el('button', 'icon-btn requeue', '');
+          requeue.type = 'button';
+          requeue.title = 'Return to Waiting';
+          requeue.innerHTML = ICON_RETURN;
+          requeue.addEventListener('click', function (e) { e.stopPropagation(); ticketAction(t, 'return'); });
+          var remove = el('button', 'icon-btn remove', '');
+          remove.type = 'button';
+          remove.title = 'Remove';
+          remove.innerHTML = ICON_TRASH;
+          remove.addEventListener('click', function (e) { e.stopPropagation(); ticketAction(t, 'remove'); });
+          actions.appendChild(complete);
+          actions.appendChild(transfer);
+          actions.appendChild(requeue);
+          actions.appendChild(remove);
+          card.appendChild(actions);
+
+          grid.appendChild(card);
+        });
+      }
+
+      function lobbyList() {
+        var scope = state.scope === 'all' ? null : watchedCodes();
+        var list = [];
+        state.queue.forEach(function (svc) {
+          if (!scope || scope.indexOf(svc.code) >= 0) svc.waiting.forEach(function (t) { list.push(t); });
+        });
+        list.sort(function (a, b) { return new Date(a.createdAt) - new Date(b.createdAt); });
+        return list;
+      }
+
+      function renderLobby() {
+        var list = lobbyList();
+        var oldest = list.length ? Math.max.apply(null, list.map(function (t) { return minutesSince(t.createdAt); })) : null;
+        $('oldest').textContent = oldest === null ? '—' : waitText(oldest);
+
+        var body = $('lobby-body');
+        body.textContent = '';
+        $('lobby-empty').classList.toggle('hidden', list.length > 0);
+        $('lobby-empty').textContent = state.scope === 'all'
+          ? 'No one is waiting in the lobby.'
+          : 'No one is waiting in your watched queues. Switch to All Lobby Customers to see everyone.';
+
+        list.forEach(function (t, i) {
+          var tr = document.createElement('tr');
+          tr.appendChild(el('td', 'num', String(i + 1)));
+          tr.appendChild(el('td', null, t.customerName));
+          tr.appendChild(el('td', null, nameOf(t.serviceCode)));
+          var m = minutesSince(t.createdAt);
+          tr.appendChild(el('td', waitClass(m), waitText(m)));
+          tr.appendChild(el('td', null, t.appointmentWith ? t.appointmentTime + ' with ' + t.appointmentWith : '—'));
+          var actions = el('td', 'actions');
+          var call = el('button', 'call', 'Call');
+          call.type = 'button';
+          call.addEventListener('click', function () { callTicket(t); });
+          var more = el('button', 'menu-btn', '⋯');
+          more.type = 'button';
+          more.title = 'More actions';
+          more.style.marginLeft = '8px';
+          more.addEventListener('click', function (e) {
+            e.stopPropagation();
+            openMenu(more, [
+              { label: 'Transfer…', run: function () { openTransfer(t); } },
+              { label: 'Remove', danger: true, run: function () { ticketAction(t, 'remove'); } }
+            ]);
+          });
+          actions.appendChild(call);
+          actions.appendChild(more);
+          tr.appendChild(actions);
+          body.appendChild(tr);
+        });
+      }
+
+      function render() {
+        renderQueueRow();
+        renderServing();
+        renderLobby();
+        $('scope').querySelectorAll('button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-scope') === state.scope);
+        });
+      }
+
+      // Completed today. The count is always shown; the table opens on request.
+      var historyOpen = false;
+
+      function clock(iso) {
+        return iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+      }
+
+      async function loadHistory() {
+        try {
+          var rows = await api('/api/staff/history');
+          renderHistory(rows);
+        } catch (err) {
+          $('history-count').textContent = '';
+        }
+      }
+
+      function renderHistory(rows) {
+        $('history-count').textContent = '(' + rows.length + ')';
+        var body = $('history-body');
+        body.textContent = '';
+        if (!rows.length) {
+          var empty = document.createElement('tr');
+          empty.appendChild(el('td', 'empty', 'No completed customers yet today.'));
+          body.appendChild(empty);
+          return;
+        }
+        rows.forEach(function (t) {
+          var tr = document.createElement('tr');
+          tr.appendChild(el('td', null, t.customerName));
+          tr.appendChild(el('td', null, nameOf(t.serviceCode)));
+          tr.appendChild(el('td', null, t.calledBy || '—'));
+          tr.appendChild(el('td', null, clock(t.calledAt)));
+          tr.appendChild(el('td', null, clock(t.completedAt)));
+          tr.appendChild(el('td', null, t.appointmentWith ? t.appointmentTime + ' with ' + t.appointmentWith : '—'));
+          body.appendChild(tr);
+        });
+      }
+
+      $('history-toggle').addEventListener('click', function () {
+        historyOpen = !historyOpen;
+        $('history-wrap').classList.toggle('hidden', !historyOpen);
+        this.textContent = historyOpen ? 'Hide' : 'Show';
+      });
+
+      async function refresh() {
+        if (!state.user) return;
+        try {
+          var res = await fetch(BASE + 'api/queue', { cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          state.queue = await res.json();
+          checkNewArrivals(state.queue);
+          render();
+          loadHistory();
+          $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+          showMsg('');
+        } catch (err) {
+          showMsg('Connection lost. Retrying…');
+        }
+      }
+
+      // ---- Sign in / out ----
+      var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
+
+      // Signing in happens on one page (index.html). It brings the person back here afterwards.
+      function showLogin() {
+        window.location.href = BASE + 'index.html?next=queue.html';
+      }
+
+      function renderCounterDisplay() {
+        $('counter-display').textContent = state.counter + ' ✎';
+      }
+
+      function showDashboard() {
+        $('dashboard').classList.remove('hidden');
+        $('signout').classList.remove('hidden');
+        $('manage-link').classList.toggle('hidden', state.user.role === 'staff');
+        $('signed-in').textContent = state.user.displayName + ' · ' + ROLE_LABEL[state.user.role] + ' · ';
+        renderCounterDisplay();
+        $('counter-display').classList.remove('hidden');
+      }
+
+      // Lets a signed-in staff member rename their station without signing out and back in —
+      // the name is only ever client-side (sent along with each "call" action), so this just
+      // updates state + the saved copy in localStorage. Edits in place rather than a prompt()
+      // dialog, consistent with the inline-form pattern used elsewhere in this app.
+      function startCounterEdit() {
+        var input = $('counter-edit');
+        input.value = state.counter;
+        $('counter-display').classList.add('hidden');
+        input.classList.remove('hidden');
+        input.focus();
+        input.select();
+      }
+
+      function commitCounterEdit() {
+        var input = $('counter-edit');
+        var next = input.value.trim().slice(0, 20);
+        input.classList.add('hidden');
+        $('counter-display').classList.remove('hidden');
+        if (next && next !== state.counter) {
+          state.counter = next;
+          localStorage.setItem('staffCounter', next);
+        }
+        renderCounterDisplay();
+      }
+
+      $('counter-display').addEventListener('click', startCounterEdit);
+      $('counter-edit').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); commitCounterEdit(); }
+        else if (e.key === 'Escape') {
+          e.preventDefault();
+          $('counter-edit').classList.add('hidden');
+          $('counter-display').classList.remove('hidden');
+        }
+      });
+      $('counter-edit').addEventListener('blur', commitCounterEdit);
+
+      // Wait for the server to clear the session before leaving the page. Otherwise the sign-in
+      // page can run before the cookie is cleared, see the session still active and send the person back.
+      $('signout').addEventListener('click', function () {
+        state.user = null;
+        closeMenu();
+        api('/api/auth/logout', { method: 'POST' })
+          .catch(function () {})
+          .then(function () { window.location.href = BASE + 'index.html'; });
+      });
+
+      // ---- Controls ----
+
+      $('scope').querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          state.scope = b.getAttribute('data-scope');
+          render();
+        });
+      });
+
+      // Calls the customer who has waited longest among the customers in scope.
+      $('add-customer').addEventListener('click', openAddCustomer);
+
+      $('call-next').addEventListener('click', function () {
+        var first = lobbyList()[0];
+        if (!first) { showMsg('No one is waiting.'); return; }
+        callTicket(first);
+      });
+
+      $('show-all-btn').addEventListener('click', function () { setHideOther(!state.hideOther); });
+      $('save-default').addEventListener('click', saveDefault);
+      $('restore-default').addEventListener('click', restoreDefaults);
+
+      loadWatched();
+      loadHideOther();
+      loadNotifyPref();
+      renderNotifyToggle();
+      if (window.io) {
+        io({ path: BASE + 'socket.io' }).on('queue:changed', refresh);
+      }
+      // Socket.IO delivers updates instantly in the normal case; this poll is just the fallback
+      // for a dropped/unsupported socket connection — and now also how quickly a desktop
+      // notification can arrive for a watched queue, so a shorter interval is worth the (small,
+      // one-GET-per-tick) extra load.
+      setInterval(refresh, 10000);
+
+      // A session cookie may already be valid from an earlier visit; check before showing the login form.
+      (async function start() {
+        if (!state.counter) { showLogin(); return; }
+        try {
+          state.user = await api('/api/auth/me');
+          if (state.user.mustChangePassword) { window.location.href = BASE + 'account.html'; return; }
+          applyDefaultQueues();
+          showDashboard();
+          refresh();
+        } catch (err) {
+          showLogin();
+        }
+      })();
+    })();
+  </script>
+  <script src="app-settings.js"></script>
+</body>
+</html>

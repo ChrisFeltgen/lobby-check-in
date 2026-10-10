@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Queue Monitor · Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <style>
+    /* A public lobby display, not a staff dashboard. Sizes scale with screen height (clamp with
+       vh) so the same page reads well on a 1080p or 4K panel. Three sections only: a compact
+       header, Now Serving, and Service Queues (one grid of department cards). */
+    :root {
+      --mon-accent: #5b9df6;
+      --mon-call: #f5b841;
+    }
+    body { min-height: 100vh; margin: 0; }
+
+    .mon { min-height: 100vh; box-sizing: border-box; padding: clamp(14px, 2.2vh, 26px) clamp(18px, 2.4vw, 36px); display: flex; flex-direction: column; gap: clamp(16px, 2.6vh, 28px); }
+
+    /* Header: title left, clock and date right. */
+    .mon-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .mon-title { margin: 0; font-size: clamp(34px, 5.6vh, 60px); font-weight: 800; letter-spacing: -0.3px; }
+    .datetime { text-align: right; flex: none; }
+    #clock { font-size: clamp(30px, 4.6vh, 50px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    #date { font-size: clamp(16px, 2.2vh, 22px); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+
+    /* A section container: Now Serving and Service Queues each hold their own items inside one
+       panel, so the page reads as two clear blocks. */
+    .box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: clamp(14px, 2vh, 22px) clamp(14px, 1.8vw, 22px); }
+
+    /* Section headings share one style. */
+    .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: clamp(10px, 1.6vh, 16px); }
+    .sec-head h2 { margin: 0; font-size: clamp(28px, 4vh, 40px); font-weight: 800; }
+    .sec-icon { flex: none; width: clamp(28px, 3.6vh, 34px); height: clamp(28px, 3.6vh, 34px); border-radius: 50%; background: color-mix(in srgb, var(--mon-accent) 16%, var(--card)); color: var(--mon-accent); display: flex; align-items: center; justify-content: center; }
+    .sec-icon svg { width: 56%; height: 56%; }
+    .icon-disc { flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--accent) 22%, var(--card)); color: var(--accent); }
+    .icon-disc svg { width: 56%; height: 56%; }
+
+    .hidden { display: none !important; }
+    .idle-note { margin: 0; font-size: clamp(22px, 3.2vh, 30px); color: var(--muted); }
+
+    /* Now Serving: a grid that adapts to how many customers are being helped. One or two get
+       large cards, three or four a compact row, five to eight a denser grid. */
+    .serving-grid { display: grid; gap: clamp(10px, 1.6vh, 16px); }
+    .serving-grid.cols-1 { grid-template-columns: minmax(0, 50%); }
+    .serving-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .serving-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .serving-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    /* Name and service on the left; the staff member on the right, under a small HELPING label. */
+    .scard { min-width: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px clamp(14px, 2vw, 28px); background: color-mix(in srgb, var(--fg) 4%, var(--card)); border: 1px solid var(--border); border-left: 5px solid var(--accent); border-radius: 14px; padding: clamp(14px, 2.2vh, 22px) clamp(16px, 2vw, 24px); }
+    .scard.size-lg { --name-size: clamp(28px, 4.6vh, 46px); --detail-size: clamp(20px, 3vh, 28px); --staff-size: clamp(26px, 3.8vh, 36px); }
+    .scard.size-md { --name-size: clamp(22px, 3.4vh, 34px); --detail-size: clamp(18px, 2.6vh, 24px); --staff-size: clamp(22px, 3.1vh, 28px); }
+    .scard.size-sm { --name-size: clamp(18px, 2.6vh, 26px); --detail-size: clamp(16px, 2.2vh, 20px); --staff-size: clamp(19px, 2.6vh, 24px); }
+    .scard-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: clamp(4px, 0.8vh, 8px); }
+    .scard-name { font-size: var(--name-size); font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+    .scard-service { display: flex; align-items: center; gap: 10px; font-size: var(--detail-size); font-weight: 600; color: var(--muted); }
+    .scard-service .icon-disc { width: clamp(26px, 3.4vh, 32px); height: clamp(26px, 3.4vh, 32px); }
+    .scard-side { flex: 0 1 auto; min-width: 0; text-align: right; padding-left: clamp(14px, 2vw, 24px); border-left: 1px solid var(--border); }
+    .scard-label { font-size: clamp(15px, 2vh, 19px); font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+    .scard-staff { font-size: var(--staff-size); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+    .scard-counter { font-size: var(--detail-size); color: var(--muted); }
+
+    /* Now Calling: a temporary, centered notice for the customer who was just called. */
+    #calling { position: fixed; left: 50%; top: 50%; z-index: 100; width: min(90vw, 980px); box-sizing: border-box; text-align: center; background: var(--card); border: 2px solid var(--call-accent, var(--mon-call)); border-radius: 22px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5); padding: clamp(22px, 3.6vh, 38px) clamp(24px, 3vw, 44px); opacity: 0; pointer-events: none; transform: translate(-50%, -50%) scale(0.96); transition: opacity 0.35s ease, transform 0.35s ease; }
+    #calling.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .call-label { font-size: clamp(14px, 2vh, 18px); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--call-accent, var(--mon-call)); }
+    .call-name { margin: 10px 0; font-size: clamp(44px, 8vh, 88px); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+    .call-service { font-size: clamp(22px, 3.2vh, 30px); font-weight: 700; color: var(--call-accent, var(--mon-call)); }
+    .call-detail { margin-top: 8px; font-size: clamp(22px, 3.4vh, 32px); color: var(--muted); }
+
+    /* Service Queues: one grid of department cards. A department with waiting customers spans
+       two columns when it has several services, so its queues sit side by side. Quiet
+       departments take a single column and show a short "no customers waiting" message. */
+    /* Service Queues layout: the wide column takes two-thirds of the width when there is a narrow
+       column beside it. Sizes follow the layout class set in renderQueues. */
+    .queues-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(12px, 1.8vh, 18px); align-items: stretch; }
+    .queues-layout.split { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    /* Departments with two or more queues waiting form the wide column; everything else stacks
+       in the narrow one. With only one kind of department, it fills the full width. */
+    .wide-stack, .other-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(12px, 1.8vh, 18px); align-items: stretch; align-content: start; }
+    .other-stack { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+    .queues-layout.other-only .other-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    /* Beside the wide column, the narrow one always stacks: one department per row. */
+    .queues-layout.split .other-stack { grid-template-columns: minmax(0, 1fr); }
+    /* The wide column stretches to match the stacked column beside it. */
+    .queues-layout.split .wide-stack { align-content: stretch; }
+    .dept { --accent: var(--mon-accent); min-width: 0; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .dept-head { display: flex; align-items: center; gap: 12px; padding: clamp(10px, 1.5vh, 14px) clamp(14px, 1.8vw, 18px); background: color-mix(in srgb, var(--accent) 20%, var(--card)); border-bottom: 3px solid var(--accent); }
+    .dept-head .icon-disc { width: clamp(30px, 4vh, 38px); height: clamp(30px, 4vh, 38px); background: var(--accent); color: #fff; }
+    .dept-name { flex: 1; min-width: 0; margin: 0; font-size: clamp(24px, 3.4vh, 34px); font-weight: 800; }
+    .dept-stats { flex: none; font-size: clamp(16px, 2.2vh, 21px); font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+    /* A department's service queues sit side by side when there is room, and each takes the full
+       width when there is only one. */
+    .dept-body { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(12px, 1.8vh, 18px); padding: clamp(10px, 1.6vh, 16px) clamp(14px, 1.8vw, 18px); align-content: start; }
+    .quiet-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: clamp(14px, 2.4vh, 24px) 16px; text-align: center; }
+    .quiet-body .icon-disc { width: clamp(38px, 5vh, 48px); height: clamp(38px, 5vh, 48px); }
+    .quiet-text { margin: 0; font-size: clamp(22px, 3.2vh, 30px); color: var(--muted); }
+    .quiet-text.is-closed { color: var(--danger); font-weight: 700; }
+
+    /* One service's queue, set on its own panel inside the department card. */
+    .sq { background: color-mix(in srgb, var(--fg) 4%, var(--card)); border: 1px solid var(--border); border-radius: 12px; padding: clamp(10px, 1.6vh, 14px); min-width: 0; }
+    .sq-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: clamp(6px, 1vh, 10px); }
+    .sq-name { flex: 1; min-width: 0; font-size: clamp(22px, 3.2vh, 30px); font-weight: 700; overflow-wrap: anywhere; }
+    .sq-list { margin: 0; padding: 0; list-style: none; }
+    .sq-list li { display: flex; align-items: center; gap: clamp(10px, 1.2vw, 14px); padding: clamp(5px, 0.8vh, 8px) 6px; border-radius: 10px; }
+    /* The customer next up gets a subtle tint and a NEXT tag. */
+    .sq-list li.is-next { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+    .pos { flex: none; width: clamp(36px, 4.8vh, 48px); height: clamp(36px, 4.8vh, 48px); border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: clamp(20px, 2.8vh, 26px); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .wname { flex: 1; min-width: 0; font-size: clamp(26px, 3.8vh, 36px); font-weight: 600; overflow-wrap: anywhere; }
+    .next-tag { flex: none; font-size: 15px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: #fff; }
+    /* A queue box scrolls on its own when its names don't all fit; the scrollbar is hidden. */
+    .sq-scroll { overflow-y: auto; scrollbar-width: none; }
+    .sq-scroll::-webkit-scrollbar { display: none; }
+    .closed-tag { flex: none; font-size: 15px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--danger) 22%, var(--card)); color: var(--danger); }
+
+    /* Narrower screens: two columns, then one. */
+    @media (max-width: 1100px) {
+      .queues-layout.split { grid-template-columns: minmax(0, 1fr); }
+      .queues-layout.other-only .other-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      .queues-layout.other-only .other-stack { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    /* Empty lobby: a welcome in place of the empty panels. */
+    .welcome { text-align: center; padding: clamp(10px, 3vh, 36px) 0 clamp(6px, 1.6vh, 16px); }
+    .welcome h2 { margin: 0; font-size: clamp(30px, 5vh, 52px); font-weight: 800; }
+    .welcome p { margin: 8px 0 0; font-size: clamp(24px, 3.4vh, 32px); color: var(--muted); }
+    .welcome p.welcome-cta { margin-top: 4px; color: var(--fg); }
+
+    #status { position: fixed; bottom: 8px; right: 12px; font-size: 18px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="mon">
+    <header class="mon-header">
+      <h1 class="mon-title">Lobby Check-In</h1>
+      <div class="datetime">
+        <div id="clock"></div>
+        <div id="date"></div>
+      </div>
+    </header>
+
+    <section id="serving-section" class="box">
+      <div class="sec-head">
+        <span class="sec-icon" id="serving-icon"></span>
+        <h2>Now Serving</h2>
+      </div>
+      <div id="serving-grid" class="serving-grid"></div>
+    </section>
+
+    <section id="welcome" class="welcome hidden">
+      <h2>Welcome to Pompano Beach</h2>
+      <p>No customers are currently waiting.</p>
+      <p class="welcome-cta">Please check in to join a service queue.</p>
+    </section>
+
+    <section id="queues-section" class="box">
+      <div class="sec-head" id="queues-head">
+        <span class="sec-icon" id="queues-icon"></span>
+        <h2>Service Queues</h2>
+      </div>
+      <div id="queues-layout" class="queues-layout">
+        <div id="wide-stack" class="wide-stack"></div>
+        <div id="other-stack" class="other-stack"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="calling" role="status" aria-live="polite">
+    <div class="call-label">Now Calling</div>
+    <div class="call-name" id="call-name"></div>
+    <div class="call-service" id="call-service"></div>
+    <div class="call-detail" id="call-detail"></div>
+  </div>
+
+  <div id="status"></div>
+
+  <script src="socket.io/socket.io.js"></script>
+  <script src="app-settings.js"></script>
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      // Waiting customers shown per service queue at once. The page size is fitted to the screen
+      // (see fitQueues): as many names as fit show at once. A queue longer than that scrolls
+      // slowly inside its box. Every position keeps its real number.
+      var MAX_PAGE = 30;
+      var MIN_PAGE = 1;
+      var pageSize = MAX_PAGE;
+      var CALL_MS;            // how long the Now Calling notice stays on screen (from Settings)
+
+      // Services that share a department are one department card, with each service keeping its
+      // own queue and numbering.
+      var GROUPS = {
+        building: { label: 'Building Dept.', codes: ['BPI', 'CR', 'BSC'] },
+        planning: { label: 'Planning & Zoning', codes: ['UF', 'ZD'] },
+        records: { label: 'Records & Alarms', codes: ['LS', 'AB'] }
+      };
+      var GROUP_BY_CODE = {};
+      Object.keys(GROUPS).forEach(function (gid) {
+        GROUPS[gid].codes.forEach(function (code) { GROUP_BY_CODE[code] = gid; });
+      });
+
+      // Which departments each monitor shows, in order: a group id (above) or a single service
+      // code. Open monitor.html?panel=left or ?panel=right. Set in Settings → Lobby monitor, and
+      // loaded below before the first draw. With no panel, every department shows.
+      var panel = new URLSearchParams(location.search).get('panel');
+      var ORDER = null;
+
+      // Lucide-style icon paths, one per service.
+      var ICON_PATHS = {
+        BPI: '<path d="M6 22V4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v18Z"/><path d="M14 9h4a1 1 0 0 1 1 1v12"/><path d="M10 9h.01M10 13h.01M10 17h.01"/><path d="M2 22h20"/>',
+        BSC: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+        CR: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+        CE: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+        BTD: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+        UF: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+        ZD: '<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894L8.106 3.447a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15.236"/><path d="M9 3.764v15.236"/>',
+        LS: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="m18.5 19.5 2 2"/>',
+        AB: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+        AC: '<path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
+      };
+      var GROUP_ICON_PATHS = { building: ICON_PATHS.BPI, planning: ICON_PATHS.ZD, records: ICON_PATHS.LS };
+      var MEGAPHONE_PATH = '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>';
+      var PEOPLE_PATH = '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
+
+      // One accent color per department, used in its card header and status line.
+      var UNIT_COLOR = {
+        building: '#2f6fd6',
+        records: '#7c4fd1',
+        planning: '#2f9e6f',
+        CE: '#c2662a',
+        BTD: '#b23b7a',
+        AC: '#1fae8e'
+      };
+      var DEFAULT_UNIT_COLOR = '#3b5bdb';
+
+      function $(id) { return document.getElementById(id); }
+
+      function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      }
+
+      // The icon paths above are fixed strings written here, not user data, so building the
+      // markup from them is safe.
+      function svgIcon(inner) {
+        var wrap = document.createElement('span');
+        wrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+        return wrap.firstChild;
+      }
+      function iconFor(code) { return svgIcon(ICON_PATHS[code] || ICON_PATHS.AC); }
+      function discFor(inner) {
+        var d = el('span', 'icon-disc');
+        d.appendChild(inner);
+        return d;
+      }
+
+      $('serving-icon').appendChild(svgIcon(MEGAPHONE_PATH));
+      $('queues-icon').appendChild(svgIcon(PEOPLE_PATH));
+
+      // Resolves the monitor's departments (or every department when no panel is chosen) into
+      // "units": a group of services, or a single service that stands on its own. Each service
+      // keeps its own serving and waiting lists, so customers are never merged across services.
+      function groupUnit(gid, services) {
+        var group = GROUPS[gid];
+        var members = group.codes.map(function (code) {
+          return services.find(function (s) { return s.code === code; });
+        }).filter(Boolean);
+        if (!members.length) return null;
+        return { key: gid, label: group.label, iconInner: GROUP_ICON_PATHS[gid] || ICON_PATHS.AC, color: UNIT_COLOR[gid] || DEFAULT_UNIT_COLOR, members: members };
+      }
+
+      // Icons are stored as markup, not as elements, so each card gets its own copy. A single
+      // element can't sit in two places at once (the header and the body of one card).
+      function soloUnit(svc) {
+        return { key: svc.code, label: svc.name, iconInner: ICON_PATHS[svc.code] || ICON_PATHS.AC, color: UNIT_COLOR[svc.code] || DEFAULT_UNIT_COLOR, members: [svc] };
+      }
+
+      function buildUnits(services) {
+        if (ORDER) {
+          return ORDER.map(function (key) {
+            if (GROUPS[key]) return groupUnit(key, services);
+            var svc = services.find(function (s) { return s.code === key; });
+            return svc ? soloUnit(svc) : null;
+          }).filter(Boolean);
+        }
+        var units = [];
+        var seenGroups = {};
+        services.forEach(function (s) {
+          var gid = GROUP_BY_CODE[s.code];
+          if (gid) {
+            if (seenGroups[gid]) return;
+            seenGroups[gid] = true;
+            var u = groupUnit(gid, services);
+            if (u) units.push(u);
+          } else {
+            units.push(soloUnit(s));
+          }
+        });
+        return units;
+      }
+
+      // The screen is one of three states. Empty shows a welcome; serving-only and waiting-only
+      // give the other half the room; both shows everything.
+      function modeFor(serving, waiting) {
+        if (!serving && !waiting) return 'empty';
+        if (!waiting) return 'serving-only';
+        if (!serving) return 'waiting-only';
+        return 'both';
+      }
+
+      function deptStats(u) {
+        var serving = 0, waiting = 0, closed = 0;
+        u.members.forEach(function (m) {
+          serving += m.serving.length;
+          waiting += m.waiting.length;
+          if (!m.available) closed++;
+        });
+        return { serving: serving, waiting: waiting, closed: closed === u.members.length };
+      }
+
+      // Now Serving: one card per customer being helped, largest when there are few.
+      function servingCard(item) {
+        var t = item.t, m = item.m, u = item.u;
+        var n = item.count;
+        var size = n <= 2 ? 'size-lg' : n <= 4 ? 'size-md' : 'size-sm';
+        var card = el('div', 'scard ' + size);
+        card.style.setProperty('--accent', u.color);
+
+        var main = el('div', 'scard-main');
+        main.appendChild(el('div', 'scard-name', displayName(t.customerName)));
+        var svc = el('div', 'scard-service');
+        svc.appendChild(discFor(iconFor(m.code)));
+        svc.appendChild(el('span', null, m.name));
+        main.appendChild(svc);
+        card.appendChild(main);
+
+        if (t.calledBy || t.counter) {
+          var side = el('div', 'scard-side');
+          if (t.calledBy) {
+            side.appendChild(el('div', 'scard-label', 'Helping'));
+            side.appendChild(el('div', 'scard-staff', t.calledBy));
+          }
+          if (t.counter) side.appendChild(el('div', 'scard-counter', t.counter));
+          card.appendChild(side);
+        }
+        return card;
+      }
+
+      function renderServing(units, mode) {
+        var grid = $('serving-grid');
+        var items = [];
+        units.forEach(function (u) {
+          u.members.forEach(function (m) {
+            m.serving.forEach(function (t) { items.push({ t: t, m: m, u: u }); });
+          });
+        });
+        items.sort(function (a, b) { return new Date(a.t.calledAt) - new Date(b.t.calledAt); });
+        $('serving-section').classList.toggle('hidden', mode === 'empty');
+
+        grid.textContent = '';
+        if (!items.length) {
+          grid.className = '';
+          grid.appendChild(el('p', 'idle-note', 'No customers are being assisted right now.'));
+          return;
+        }
+        var cols = Math.min(items.length, 4);
+        grid.className = 'serving-grid cols-' + cols;
+        items.forEach(function (item) {
+          item.count = items.length;
+          grid.appendChild(servingCard(item));
+        });
+      }
+
+      // Now Calling: when someone newly appears in Now Serving, a centered notice shows their
+      // name, service and staff for a while. The first load only records who is already being
+      // helped, so a page reload does not announce old calls.
+      var knownServing = null;
+      var callTimer = null;
+      function announceNewCalls(units) {
+        var current = {};
+        var fresh = [];
+        units.forEach(function (u) {
+          u.members.forEach(function (m) {
+            m.serving.forEach(function (t) {
+              current[t.id] = true;
+              if (knownServing && !knownServing[t.id]) fresh.push({ t: t, m: m, u: u });
+            });
+          });
+        });
+        knownServing = current;
+        if (!fresh.length) return;
+        fresh.sort(function (a, b) { return new Date(a.t.calledAt) - new Date(b.t.calledAt); });
+        showCalling(fresh[fresh.length - 1]);
+      }
+
+      function showCalling(item) {
+        var box = $('calling');
+        box.style.setProperty('--call-accent', item.u.color);
+        $('call-name').textContent = displayName(item.t.customerName);
+        $('call-service').textContent = item.m.name;
+        $('call-detail').textContent = (item.t.calledBy || 'Our staff') + ' will be with you shortly.';
+        playChime();
+        box.classList.add('show');
+        clearTimeout(callTimer);
+        callTimer = setTimeout(function () { box.classList.remove('show'); }, CALL_MS);
+      }
+
+      // Customers are shown as first name and last initial, e.g. "Jane S." for "Jane Smith".
+      // A single name is shown as it was given.
+      function displayName(name) {
+        var parts = String(name || '').trim().split(/\s+/);
+        if (parts.length < 2) return parts[0] || '';
+        return parts[0] + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.';
+      }
+
+      var audioCtx = null;
+      var chimeOn = false;    // from Settings → Lobby monitor, once loaded
+
+      // Plays a short, cheerful rising arpeggio made with the Web Audio API, so no sound file is needed.
+      function playChime() {
+        if (!chimeOn) return;
+        try {
+          audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+          var t0 = audioCtx.currentTime;
+          [[659.25, 0], [783.99, 0.14], [1046.5, 0.28]].forEach(function (note) {
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            var start = t0 + note[1];
+            osc.type = 'sine';
+            osc.frequency.value = note[0];
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(start);
+            osc.stop(start + 0.55);
+          });
+        } catch (e) { /* no audio here: the on-screen banner still shows */ }
+      }
+
+      // One service's queue inside a department card. Positions are the real numbers, and only
+      // the first customer overall gets the NEXT tag. A queue longer than the space shows scrolls
+      // slowly inside its box (see tickScrollers), so every customer stays in the same numbered slot.
+      function queueBlock(m, showName) {
+        var block = el('section', 'sq');
+        var head = el('div', 'sq-head');
+        // A department with one service already shows that service's name in its header.
+        if (showName) head.appendChild(el('span', 'sq-name', m.name));
+        else head.appendChild(el('span', 'sq-name'));
+        if (!m.available) head.appendChild(el('span', 'closed-tag', 'Closed'));
+        block.appendChild(head);
+
+        var box = el('div', 'sq-scroll');
+        box.dataset.key = m.code;
+        box.dataset.rows = String(m.waiting.length);
+        var list = el('ol', 'sq-list');
+        m.waiting.forEach(function (t, i) {
+          var li = el('li');
+          if (i === 0) li.className = 'is-next';
+          li.appendChild(el('span', 'pos', String(i + 1)));
+          li.appendChild(el('span', 'wname', displayName(t.customerName)));
+          if (i === 0) li.appendChild(el('span', 'next-tag', 'Next'));
+          list.appendChild(li);
+        });
+        box.appendChild(list);
+        block.appendChild(box);
+        return block;
+      }
+
+      // Header text for a department, e.g. "2 serving · 4 waiting".
+      function deptHeadText(st) {
+        var parts = [];
+        if (st.serving) parts.push(st.serving + ' serving');
+        parts.push(st.waiting + ' waiting');
+        return parts.join(' · ');
+      }
+
+      function deptHeader(u, st) {
+        var head = el('header', 'dept-head');
+        head.appendChild(discFor(svgIcon(u.iconInner)));
+        head.appendChild(el('h3', 'dept-name', u.label));
+        head.appendChild(el('span', 'dept-stats', deptHeadText(st)));
+        return head;
+      }
+
+      // A department with someone waiting: its header and every service queue inside.
+      function deptCard(u, st) {
+        var card = el('article', 'dept');
+        card.style.setProperty('--accent', u.color);
+        card.appendChild(deptHeader(u, st));
+
+        var body = el('div', 'dept-body');
+        u.members.forEach(function (m) {
+          if (m.waiting.length) body.appendChild(queueBlock(m, u.members.length > 1));
+        });
+        card.appendChild(body);
+        return card;
+      }
+
+      // A department with nobody waiting: same card, with a short message instead of queues.
+      function quietCard(u, st) {
+        var card = el('article', 'dept');
+        card.style.setProperty('--accent', u.color);
+        card.appendChild(deptHeader(u, st));
+
+        var body = el('div', 'quiet-body');
+        body.appendChild(discFor(svgIcon(u.iconInner)));
+        var text = st.closed ? 'Closed' : 'No customers waiting';
+        body.appendChild(el('p', 'quiet-text' + (st.closed ? ' is-closed' : ''), text));
+        card.appendChild(body);
+        return card;
+      }
+
+      // Departments are split into the wide column and the other column; see the layout CSS.
+      var lastUnits = null;
+      var lastMode = null;
+      // Finds the largest page size whose whole page still fits the window, so names are only
+      // rotated when they genuinely don't fit. Binary search: each try is a quick redraw.
+      function fitQueues(units, mode) {
+        // A hidden or collapsed window has no usable height; measuring it would wrongly shrink
+        // every queue, so leave the page size as it is.
+        if (window.innerHeight < 200) { drawQueues(units, mode); return; }
+        var lo = MIN_PAGE, hi = MAX_PAGE, best = MIN_PAGE;
+        while (lo <= hi) {
+          var mid = (lo + hi) >> 1;
+          pageSize = mid;
+          drawQueues(units, mode);
+          if (document.body.scrollHeight <= window.innerHeight) { best = mid; lo = mid + 1; }
+          else hi = mid - 1;
+        }
+        pageSize = best;
+        drawQueues(units, mode);
+      }
+
+      function renderQueues(units, mode) {
+        fitQueues(units, mode);
+      }
+
+      function drawQueues(units, mode) {
+        // wide: a department with two or more queues waiting. other: everything else.
+        var wide = [], other = [];
+        units.forEach(function (u) {
+          var st = deptStats(u);
+          var queuesWaiting = u.members.filter(function (m) { return m.waiting.length; }).length;
+          (queuesWaiting > 1 ? wide : other).push({ u: u, st: st });
+        });
+
+        var wideStack = $('wide-stack');
+        var otherStack = $('other-stack');
+        wideStack.textContent = '';
+        otherStack.textContent = '';
+        wide.forEach(function (x) { wideStack.appendChild(deptCard(x.u, x.st)); });
+        other.forEach(function (x) {
+          otherStack.appendChild(x.st.waiting ? deptCard(x.u, x.st) : quietCard(x.u, x.st));
+        });
+        wideStack.classList.toggle('hidden', !wide.length);
+        otherStack.classList.toggle('hidden', !other.length);
+        $('queues-layout').className = 'queues-layout' +
+          (wide.length && other.length ? ' split' : !wide.length ? ' other-only' : '');
+
+        $('queues-head').classList.toggle('hidden', mode === 'empty');
+        $('queues-section').classList.toggle('hidden', mode === 'empty' && !other.length);
+        $('welcome').classList.toggle('hidden', mode !== 'empty');
+        sizeScrollers();
+      }
+
+      // Each queue box is as tall as the page size allows (never taller than its own queue), so a
+      // longer queue scrolls inside it instead of pushing the page past the screen.
+      function sizeScrollers() {
+        document.querySelectorAll('.sq-scroll').forEach(function (box) {
+          var first = box.querySelector('li');
+          if (!first) return;
+          var rowH = first.offsetHeight;
+          var rows = Math.min(pageSize, Number(box.dataset.rows));
+          box.style.maxHeight = (rows * rowH) + 'px';
+        });
+      }
+
+      // Slow, continuous scroll for any queue that doesn't fit: down, pause, back up, pause.
+      // Each queue's position is remembered by service code, so a redraw doesn't restart it.
+      var SCROLL_PX = 1;        // pixels per tick
+      var SCROLL_TICK_MS;     // from Settings → Lobby monitor, once loaded
+      var SCROLL_PAUSE = 75;    // ticks to rest at each end (about 3 seconds)
+      var scrollState = {};
+      function tickScrollers() {
+        document.querySelectorAll('.sq-scroll').forEach(function (box) {
+          var max = box.scrollHeight - box.clientHeight;
+          // Ignore a few pixels of rounding; only a real overflow scrolls.
+          if (max <= 8) { box.scrollTop = 0; return; }
+          var s = scrollState[box.dataset.key] || (scrollState[box.dataset.key] = { pos: 0, dir: 1, pause: SCROLL_PAUSE });
+          if (s.pause > 0) { s.pause--; return; }
+          s.pos += s.dir * SCROLL_PX;
+          if (s.pos >= max) { s.pos = max; s.dir = -1; s.pause = SCROLL_PAUSE; }
+          else if (s.pos <= 0) { s.pos = 0; s.dir = 1; s.pause = SCROLL_PAUSE; }
+          box.scrollTop = s.pos;
+        });
+      }
+      var scrollTimer = null;
+
+      function render(services) {
+        var units = buildUnits(services);
+        var serving = 0, waiting = 0;
+        units.forEach(function (u) {
+          u.members.forEach(function (m) { serving += m.serving.length; waiting += m.waiting.length; });
+        });
+        var mode = modeFor(serving, waiting);
+        lastUnits = units;
+        lastMode = mode;
+        announceNewCalls(units);
+        renderServing(units, mode);
+        renderQueues(units, mode);
+      }
+
+      async function refresh() {
+        try {
+          var res = await fetch(BASE + 'api/queue', { cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          render(await res.json());
+          $('status').textContent = '';
+        } catch (err) {
+          $('status').textContent = 'Connection lost, retrying…';
+        }
+      }
+
+      // A window resize changes how many names fit, so re-fit the page size.
+      window.addEventListener('resize', function () {
+        if (lastUnits) fitQueues(lastUnits, lastMode);
+      });
+
+      function tick() {
+        var now = new Date();
+        $('clock').textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        $('date').textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      setInterval(tick, 1000);
+      tick();
+
+      // The screen starts once the settings from Management → Settings → Kiosk and monitor have loaded.
+      var SCROLL_SPEEDS = { slow: 60, normal: 40, fast: 25 };
+      function applyMonitorSettings(s) {
+        document.documentElement.setAttribute('data-theme', s.monitor_theme);
+        CALL_MS = s.monitor_call_seconds * 1000;
+        chimeOn = s.monitor_chime;
+        if (panel === 'left') ORDER = s.monitor_left;
+        else if (panel === 'right') ORDER = s.monitor_right;
+        SCROLL_TICK_MS = SCROLL_SPEEDS[s.monitor_scroll];
+        clearInterval(scrollTimer);
+        scrollTimer = setInterval(tickScrollers, SCROLL_TICK_MS);
+        refresh();
+      }
+      window.appSettingsReady.then(function (s) {
+        applyMonitorSettings(s);
+        window.watchAppSettings(applyMonitorSettings);
+
+        if (window.io) {
+          io({ path: BASE + 'socket.io' }).on('queue:changed', refresh);
+        }
+        setInterval(refresh, 30000);
+        refresh();
+      });
+    })();
+  </script>
+</body>
+</html>

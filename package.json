@@ -1,0 +1,19 @@
+{
+  "name": "virtual-queue",
+  "version": "1.0.0",
+  "description": "Virtual queue system: customer kiosk, queue portal, and queue display monitors",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/auth.test.js tests/availability.test.js tests/reports.test.js tests/schema.test.js tests/settings.test.js tests/http.test.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.22.3",
+    "mysql2": "^3.24.5",
+    "socket.io": "^4.8.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

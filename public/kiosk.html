@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Check In · Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <style>
+    /* Palette from the City of Pompano Beach website: light gray page, white cards, teal headings,
+       cyan accents. The header is always the deep blue bar. The colour scheme (light or dark) is set
+       in Management → Settings → Kiosk colours. */
+    body.kiosk {
+      --k-bg: #eef4f9;
+      --k-text: #0b2a4a;
+      --k-card: #ffffff;
+      --k-muted: #5b6b7b;
+      --k-accent: #0f7c8c;
+      --k-accent-cyan: #009dc2;
+      --k-blue: #1f6feb;
+      --k-on-accent: #ffffff;
+      --k-border: #d7e0ea;
+      --k-key-shadow: #c9d2dd;
+      --k-icon-bg: #e6f2f5;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--k-bg);
+      color: var(--k-text);
+    }
+    /* Dark palette, used when Settings → Kiosk colours is set to dark. */
+    html[data-theme="dark"] body.kiosk {
+      --k-bg: #12161c;
+      --k-text: #e8ecf1;
+      --k-card: #1c222b;
+      --k-muted: #9aa5b5;
+      --k-accent: #3fb6c4;
+      --k-accent-cyan: #3fb6c4;
+      --k-blue: #4c8dff;
+      --k-on-accent: #0b1220;
+      --k-border: #2e3742;
+      --k-key-shadow: #07090c;
+      --k-icon-bg: #1d3640;
+    }
+
+    /* Header bar */
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 28px;
+      background: linear-gradient(90deg, #0a4670 0%, #0b6a9c 100%);
+      color: #ffffff;
+    }
+    .brand { display: flex; align-items: center; gap: 18px; }
+    .logo-wrap { background: #ffffff; border-radius: 10px; padding: 6px 10px; display: flex; }
+    .logo { max-height: 52px; width: auto; display: block; }
+    .divider { width: 1px; height: 48px; background: rgba(255, 255, 255, 0.35); }
+    .top h1 { margin: 0; font-size: 36px; font-weight: 700; color: #ffffff; }
+    .theme-btn {
+      background: transparent;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      font-size: 20px;
+      min-height: 56px;
+      padding: 0 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .top-actions { display: flex; gap: 12px; }
+
+    /* flex:1 sizes this to exactly the space left under the header; overflow:hidden plus the JS
+       auto-fit below means content that doesn't fit gets scaled down instead of causing a scroll. */
+    main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 28px 28px; width: 100%; max-width: 1400px; margin: 0 auto; overflow: visible; transform-origin: top center; }
+    section { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .hidden { display: none !important; }
+    .muted { color: var(--k-muted); }
+
+    /* Welcome and language choice */
+    .welcome { align-items: center; justify-content: center; }
+    .welcome-card {
+      width: 100%;
+      max-width: 1300px;
+      background: var(--k-card);
+      border-radius: 24px;
+      border-top: 10px solid var(--k-accent);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
+      padding: 40px 40px 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      text-align: center;
+    }
+    .welcome-title { margin: 0; font-size: clamp(52px, 7vmin, 80px); white-space: nowrap; font-weight: 600; line-height: 1.1; color: var(--k-accent); }
+    .welcome-title-es { margin: -8px 0 6px; font-size: clamp(34px, 4.6vmin, 50px); color: var(--k-muted); }
+    .welcome-sub { margin: 0; font-size: clamp(30px, 4vmin, 40px); font-weight: 700; color: var(--k-text); }
+    .lang-buttons { display: flex; flex-direction: column; gap: 16px; width: 100%; max-width: 560px; }
+    .lang-btn {
+      min-height: clamp(70px, 8vmin, 96px);
+      font-size: 40px;
+      font-weight: 700;
+      color: var(--k-on-accent);
+      background: var(--k-accent);
+      border: 0;
+      border-radius: 16px;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lang-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15); }
+
+    /* Service selection */
+    .hero { text-align: center; margin: 8px 0 0; }
+    .hero h2 { margin: 0; font-size: clamp(30px, 4.3vmin, 46px); font-weight: 700; color: var(--k-accent); }
+    .hero p { margin: 8px 0 0; font-size: 26px; color: var(--k-muted); }
+    .tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin-top: 4px; }
+    .tile {
+      flex: 0 1 calc(25% - 18px);
+      min-width: 250px;
+      min-height: clamp(190px, 23vmin, 270px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      padding: 26px 20px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--k-border);
+      border-top: 8px solid var(--k-accent);
+      background: var(--k-card);
+      color: var(--k-text);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease;
+    }
+    /* Touch screens have no hover, so give feedback when the card is pressed. */
+    .tile:active { transform: scale(0.97); border-color: var(--k-accent-cyan); box-shadow: 0 0 0 3px rgba(0, 157, 194, 0.25); }
+    .tile:focus-visible { outline: 4px solid var(--k-accent-cyan); outline-offset: 4px; }
+    .tile .icon { width: clamp(80px, 11vmin, 116px); height: clamp(80px, 11vmin, 116px); border-radius: 50%; background: var(--k-icon-bg); color: var(--k-accent); display: flex; align-items: center; justify-content: center; }
+    .tile .icon svg { width: clamp(44px, 6vmin, 60px); height: clamp(44px, 6vmin, 60px); }
+    .tile .tname { display: flex; align-items: center; justify-content: center; min-height: 2.24em; font-size: 24px; font-weight: 700; line-height: 1.12; color: var(--k-accent); text-wrap: balance; }
+    .tile .tdesc { font-size: 19px; line-height: 1.3; color: var(--k-muted); min-height: 52px; }
+    /* A closed service: dimmed, its reason stands in for the description, but still tappable —
+       tapping it shows the full-screen unavailable message rather than doing nothing. */
+    .tile.unavailable { opacity: 0.6; border-top-color: var(--k-muted); }
+    .tile.unavailable:active { transform: scale(0.97); border-color: #f0c572; box-shadow: 0 0 0 3px rgba(240, 197, 114, 0.35); }
+    /* Forces the 4-3-3 arrangement: a full-width break after the 4th and 7th cards. */
+    .tiles .row-break { flex-basis: 100%; height: 0; }
+
+    /* Name, host and time entry */
+    .name-step { align-items: center; }
+    .name-card {
+      width: 100%;
+      max-width: 1100px;
+      background: var(--k-card);
+      border-radius: 24px;
+      border-top: 10px solid var(--k-accent);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
+      padding: 2.4vmin 40px 3vmin;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .svc-label { margin: 0; text-align: center; font-size: 22px; color: var(--k-muted); }
+    .svc-pill {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 24px 10px 12px;
+      border-radius: 999px;
+      background: var(--k-icon-bg);
+      color: var(--k-accent);
+      font-size: 26px;
+      font-weight: 700;
+    }
+    .svc-icon { width: 52px; height: 52px; border-radius: 50%; background: var(--k-card); display: flex; align-items: center; justify-content: center; }
+    .svc-icon svg { width: 30px; height: 30px; }
+    .name-title { margin: 6px 0 0; text-align: center; font-size: clamp(30px, 4vmin, 44px); font-weight: 700; color: var(--k-text); }
+    .name-sub { margin: 0; text-align: center; font-size: 24px; color: var(--k-muted); }
+    .field {
+      display: flex;
+      align-items: center;
+      min-height: 8vmin;
+      padding: 0 24px;
+      border: 2px solid var(--k-blue);
+      border-radius: 14px;
+      background: var(--k-card);
+      color: var(--k-text);
+      font-size: 40px;
+      word-break: break-word;
+    }
+    .field .ph { color: #9aa9b9; font-size: 34px; }
+    .field .caret { width: 3px; height: 46px; background: var(--k-blue); margin-left: 2px; animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .keys { display: grid; gap: 10px; }
+    .keyrow { display: flex; gap: 10px; justify-content: center; }
+    .key {
+      flex: 1;
+      max-width: 96px;
+      min-height: 6vmin;
+      font-size: 28px;
+      font-weight: 600;
+      padding: 0;
+      background: var(--k-card);
+      color: var(--k-text);
+      border: 1px solid var(--k-border);
+      border-radius: 12px;
+      box-shadow: 0 3px 0 var(--k-key-shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .key:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--k-key-shadow); }
+    .key.action { flex: 1.4; max-width: 120px; background: var(--k-bg); }
+    .key.action svg { width: 30px; height: 30px; }
+    .key.on { background: var(--k-blue); color: #ffffff; border-color: var(--k-blue); }
+    .key.wide { max-width: 520px; flex: 6; }
+
+    .error { color: #c62828; font-size: 22px; text-align: center; min-height: 26px; margin: 0; }
+    .row { display: flex; gap: 16px; }
+    .btn-back, .btn-join {
+      flex: 1;
+      min-height: 7.5vmin;
+      border-radius: 16px;
+      font-size: 28px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-back { background: var(--k-card); color: var(--k-accent); border: 2px solid var(--k-accent); }
+    .btn-join { background: var(--k-blue); color: #ffffff; border: 2px solid var(--k-blue); }
+    .btn-back svg, .btn-join svg { width: 30px; height: 30px; }
+    .btn-join:disabled { opacity: 0.6; }
+
+    /* Time slots */
+    .time-groups { display: flex; flex-direction: column; gap: 14px; }
+    .time-group { background: var(--k-bg); border-radius: 14px; padding: 14px 16px; }
+    .time-group-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; font-size: 24px; font-weight: 700; color: var(--k-accent); }
+    .time-group-range { font-size: 18px; font-weight: 400; color: var(--k-muted); }
+    .time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .time-slot {
+      min-height: 7vmin;
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--k-text);
+      background: var(--k-card);
+      border: 2px solid var(--k-border);
+      border-radius: 14px;
+      box-shadow: 0 3px 0 var(--k-key-shadow);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .time-slot:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--k-key-shadow); }
+    .time-slot:hover { border-color: var(--k-accent-cyan); }
+    .time-slot.selected { background: var(--k-accent); color: var(--k-on-accent); border-color: var(--k-accent); box-shadow: none; }
+    .time-slot:disabled { opacity: 0.5; }
+
+    /* Done */
+    .done { text-align: center; align-items: center; justify-content: center; }
+    .big { font-size: 28px; margin: 0; }
+    #done-btn { font-size: 26px; min-height: 72px; padding: 0 40px; align-self: center; }
+
+    /* Full-screen takeover shown when a tapped service turns out to be closed. */
+    .unavailable-screen { text-align: center; align-items: center; justify-content: center; gap: 18px; }
+    .unavailable-icon { width: clamp(72px, 10vmin, 108px); height: clamp(72px, 10vmin, 108px); border-radius: 50%; background: #fdf0d5; color: #9a5b00; display: flex; align-items: center; justify-content: center; }
+    .unavailable-icon svg { width: 55%; height: 55%; }
+    .unavailable-name { margin: 0; font-size: clamp(32px, 5vmin, 54px); font-weight: 700; color: var(--k-text); }
+    .unavailable-sub { margin: 0; font-size: clamp(22px, 3vmin, 30px); font-weight: 700; color: #9a5b00; }
+    .unavailable-message { margin: 6px 0 0; max-width: 900px; font-size: clamp(22px, 3.2vmin, 32px); line-height: 1.4; color: var(--k-text); background: #fdf7ec; border: 1px solid #f0c572; border-radius: 16px; padding: 22px 30px; }
+    #unavail-back { flex: none; align-self: center; width: 100%; max-width: 420px; margin-top: 12px; }
+
+    /* Appointment progress and the appointee screen */
+    .steps { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .step { font-size: 20px; padding: 8px 16px; border-radius: 999px; background: var(--k-bg); color: var(--k-muted); border: 1px solid var(--k-border); }
+    .step.done { color: var(--k-accent); border-color: var(--k-accent); }
+    .step.current { background: var(--k-blue); color: #ffffff; border-color: var(--k-blue); font-weight: 700; }
+    .name-summary { margin: 0; text-align: center; font-size: 24px; font-weight: 600; color: var(--k-accent); }
+    #step-name.host-mode .name-card { border-top-color: var(--k-blue); }
+    #step-name.host-mode .name-title { color: var(--k-blue); }
+
+    /* Transitions: steps fade and slide in, service cards appear in sequence. */
+    @keyframes stepIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+    @keyframes tileIn { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+    /* 'backwards' fill only applies before the animation starts, so the press effect on cards still works. */
+    .step-enter { animation: stepIn 0.4s ease-out backwards; }
+    .tile-enter { animation: tileIn 0.45s ease-out backwards; }
+    @media (prefers-reduced-motion: reduce) { .step-enter, .tile-enter { animation: none; } }
+
+  </style>
+</head>
+<body class="kiosk">
+  <header class="top">
+    <div class="brand">
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <span class="divider"></span>
+      <h1 data-i18n="brand">Check In</h1>
+    </div>
+    <div class="top-actions">
+      <button id="lang-toggle" class="theme-btn" type="button">Español</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Welcome: the visitor chooses a language first -->
+    <section id="step-welcome" class="welcome">
+      <div class="welcome-card">
+        <h2 class="welcome-title">Welcome - Please Check In Here</h2>
+        <p class="welcome-title-es">Bienvenido - Regístrese aquí</p>
+        <p class="welcome-sub">Select a Language:</p>
+        <div class="lang-buttons">
+          <button class="lang-btn" type="button" data-lang="en">English</button>
+          <button class="lang-btn" type="button" data-lang="es">Español</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="step-service" class="hidden">
+      <div class="hero">
+        <h2 data-i18n="hero_title">What can we help you with today?</h2>
+        <p data-i18n="hero_sub">Please select the service you need.</p>
+      </div>
+      <div class="tiles" id="tiles"></div>
+      <p class="error" id="service-error"></p>
+    </section>
+
+    <!-- Used for the visitor's name, and for the host name on appointment visits -->
+    <section id="step-name" class="hidden name-step">
+      <div class="name-card">
+        <div class="steps" id="steps"></div>
+        <div class="svc-pill"><span class="svc-icon" id="chosen-icon"></span><span id="chosen"></span></div>
+        <h2 class="name-title" id="name-title"></h2>
+        <p class="name-sub" id="name-sub"></p>
+        <p class="name-summary hidden" id="name-summary"></p>
+        <div class="field" id="name-display"></div>
+        <div class="keys" id="keys"></div>
+        <p class="error" id="name-error"></p>
+        <div class="row">
+          <button class="btn-back" id="back" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            <span data-i18n="btn_back">Back</span>
+          </button>
+          <button class="btn-join" id="submit" type="button">
+            <span id="submit-label"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Appointment visits only: the appointment time -->
+    <section id="step-time" class="hidden name-step">
+      <div class="name-card">
+        <div class="steps" id="steps-time"></div>
+        <p class="svc-label"><span data-i18n="appt_with">Appointment with</span> <strong id="host-label"></strong></p>
+        <h2 class="name-title" data-i18n="time_title">What time is your appointment?</h2>
+        <p class="name-sub" data-i18n="time_sub">Select your scheduled time.</p>
+        <div class="time-groups" id="time-grid"></div>
+        <p class="error" id="time-error"></p>
+        <div class="row">
+          <button class="btn-back" id="time-back" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            <span data-i18n="btn_back">Back</span>
+          </button>
+          <button class="btn-join" id="time-continue" type="button" disabled>
+            <span data-i18n="btn_continue">Continue</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="step-done" class="hidden done">
+      <p class="big"><span data-i18n="done_checked">You are checked in,</span> <strong id="done-name"></strong>.</p>
+      <p class="big" id="done-ahead"></p>
+      <p class="big muted" data-i18n="done_watch">Please watch the display screens for your name.</p>
+      <button id="done-btn" type="button" data-i18n="btn_done">Done</button>
+    </section>
+
+    <!-- Shown when a tapped service turns out to be closed, instead of silently doing nothing. -->
+    <section id="step-unavailable" class="hidden unavailable-screen">
+      <span class="unavailable-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      </span>
+      <h2 class="unavailable-name" id="unavail-name"></h2>
+      <p class="unavailable-sub" id="unavail-sub"></p>
+      <p class="unavailable-message" id="unavail-message"></p>
+      <button class="btn-back" id="unavail-back" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        <span data-i18n="btn_back">Back</span>
+      </button>
+    </section>
+  </main>
+
+  <script src="socket.io/socket.io.js"></script>
+  <script src="app-settings.js"></script>
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      var APPOINTMENT_CODE = 'AC';
+      var ROWS = [
+        ['Q','W','E','R','T','Y','U','I','O','P'],
+        ['A','S','D','F','G','H','J','K','L'],
+        ['Z','X','C','V','B','N','M','-','’']
+      ];
+      // Appointment times offered on the kiosk: every 30 minutes, 7:00 AM to 5:30 PM (open 7:00 AM to 6:00 PM).
+      var TIME_SLOTS = [];
+      for (var mins = 7 * 60; mins <= 17 * 60 + 30; mins += 30) {
+        var h = Math.floor(mins / 60), m = mins % 60;
+        TIME_SLOTS.push(((h + 11) % 12 + 1) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'));
+      }
+      // Set from Management → Settings → Kiosk before the first screen is shown (see the end of this script).
+      var IDLE_MS, DONE_MS;
+
+      var LANG = 'en';
+      var servicesCache = null;
+      var service = null;
+      var stage = 'name';       // 'name' | 'host' (appointment visits only)
+      var name = '';            // text in the field for the current stage
+      var customerName = '';
+      var hostName = '';
+      var apptTime = '';
+      var caps = false;
+      var resetTimer = null;
+      var busy = false;
+      var lastAhead = 0;
+
+      // All kiosk text. English is the default; anything missing from Spanish falls back to English.
+      var T = {
+        en: {
+          brand: 'Check In',
+          hero_title: 'What can we help you with today?',
+          hero_sub: 'Please select the service you need.',
+          step_name: 'Your name', step_appt: 'Appointment', step_time: 'Time',
+          title_name: 'What is your name?',
+          sub_name: 'Enter your first and last name to join the queue.',
+          title_host: 'Who is your appointment with?',
+          sub_host: 'Type the name of the person you are here to see.',
+          ph_name: 'Type your name',
+          ph_host: 'Type the person’s name',
+          checking_in: 'Checking in:',
+          btn_back: 'Back', btn_join: 'Join Queue', btn_next: 'Next', btn_continue: 'Continue', btn_done: 'Done',
+          appt_with: 'Appointment with',
+          time_title: 'What time is your appointment?',
+          time_sub: 'Select your scheduled time.',
+          morning: 'Morning', afternoon: 'Afternoon', space: 'Space',
+          err_name: 'Please enter your name.',
+          err_host: 'Please enter the name of the person you are seeing.',
+          err_time: 'Please select your appointment time.',
+          err_generic: 'Could not check in. Please try again.',
+          err_services: 'Services are unavailable. Please ask staff for help.',
+          unavailable_sub: 'is currently unavailable',
+          done_checked: 'You are checked in,',
+          done_next: 'You are next!',
+          done_one: 'There is 1 person ahead of you.',
+          done_many: 'There are {n} people ahead of you.',
+          done_watch: 'Please watch the display screens for your name.'
+        },
+        es: {
+          brand: 'Registro',
+          hero_title: '¿En qué podemos ayudarle hoy?',
+          hero_sub: 'Seleccione el servicio que necesita.',
+          step_name: 'Su nombre', step_appt: 'Cita', step_time: 'Hora',
+          title_name: '¿Cuál es su nombre?',
+          sub_name: 'Escriba su nombre y apellido para entrar en la fila.',
+          title_host: '¿Con quién tiene su cita?',
+          sub_host: 'Escriba el nombre de la persona que va a ver.',
+          ph_name: 'Escriba su nombre',
+          ph_host: 'Escriba el nombre de la persona',
+          checking_in: 'Registrando:',
+          btn_back: 'Atrás', btn_join: 'Registrarse', btn_next: 'Siguiente', btn_continue: 'Continuar', btn_done: 'Listo',
+          appt_with: 'Cita con',
+          time_title: '¿A qué hora es su cita?',
+          time_sub: 'Seleccione la hora de su cita.',
+          morning: 'Mañana', afternoon: 'Tarde', space: 'Espacio',
+          err_name: 'Por favor, escriba su nombre.',
+          err_host: 'Por favor, escriba el nombre de la persona que va a ver.',
+          err_time: 'Por favor, seleccione la hora de su cita.',
+          err_generic: 'No se pudo registrar. Intente de nuevo.',
+          err_services: 'Los servicios no están disponibles. Pida ayuda al personal.',
+          unavailable_sub: 'no está disponible en este momento',
+          done_checked: 'Usted está registrado,',
+          done_next: '¡Usted es el siguiente!',
+          done_one: 'Hay 1 persona delante de usted.',
+          done_many: 'Hay {n} personas delante de usted.',
+          done_watch: 'Por favor, esté atento a las pantallas para su nombre.'
+        }
+      };
+
+      // Spanish service names and descriptions, keyed by service code. Review with staff before launch.
+      var SERVICE_ES = {
+        BPI: { name: 'Permisos de construcción e inspecciones', description: 'Permisos, revisión de planos e inspecciones' },
+        BSC: { name: 'Cumplimiento de seguridad de construcción', description: 'Inspecciones y cumplimiento de seguridad de construcción' },
+        CR: { name: 'Registro de contratistas', description: 'Registro y licencias de contratistas' },
+        CE: { name: 'Cumplimiento de códigos', description: 'Cumplimiento de códigos, infracciones y casos' },
+        BTD: { name: 'Recibos de impuestos comerciales', description: 'Recibos de impuestos comerciales y servicios relacionados' },
+        UF: { name: 'Paisajismo y silvicultura urbana', description: 'Paisajismo, silvicultura urbana y servicios de árboles' },
+        LS: { name: 'Búsqueda de gravámenes y permisos vencidos', description: 'Búsqueda de gravámenes y permisos vencidos' },
+        ZD: { name: 'Zonificación', description: 'Preguntas y revisiones de zonificación' },
+        AB: { name: 'Facturación de alarmas', description: 'Permisos y servicios de facturación de alarmas' },
+        AC: { name: 'Registro de citas', description: 'Registro para citas programadas' }
+      };
+
+      // Icon per service code. Services without an entry still appear, without an icon.
+      var SVG_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+      var SVG_CLOSE = '</svg>';
+      var SERVICE_DETAILS = {
+        BPI: {
+          description: 'Permits, plan review, inspections',
+          icon: SVG_OPEN + '<path d="M4 21V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v16"/><path d="M15 9h4a1 1 0 0 1 1 1v11"/><path d="M3 21h18"/><path d="M8 7h2M8 11h2M8 15h2M11 7h2M11 11h2M11 15h2"/>' + SVG_CLOSE
+        },
+        ZD: {
+          description: 'Zoning questions and reviews',
+          icon: SVG_OPEN + '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>' + SVG_CLOSE
+        },
+        CE: {
+          description: 'Code compliance, violations and cases',
+          icon: SVG_OPEN + '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>' + SVG_CLOSE
+        },
+        BSC: {
+          description: 'Building safety inspections and compliance',
+          icon: SVG_OPEN + '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 13l2 2 4-4"/>' + SVG_CLOSE
+        },
+        CR: {
+          description: 'Contractor registration and licensing',
+          icon: SVG_OPEN + '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/>' + SVG_CLOSE
+        },
+        AC: {
+          description: 'Check in for scheduled appointments',
+          icon: SVG_OPEN + '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/>' + SVG_CLOSE
+        },
+        LS: {
+          description: 'Search for liens and expired permits',
+          icon: SVG_OPEN + '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h5"/><path d="M14 3l5 5v4"/><circle cx="16.5" cy="16.5" r="2.8"/><path d="M18.5 18.5 21 21"/>' + SVG_CLOSE
+        },
+        BTD: {
+          description: 'Business tax receipts and related services',
+          icon: SVG_OPEN + '<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>' + SVG_CLOSE
+        },
+        AB: {
+          description: 'Alarm permits and billing services',
+          icon: SVG_OPEN + '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4M12 3v2"/>' + SVG_CLOSE
+        },
+        UF: {
+          description: 'Landscape, urban forestry and tree services',
+          icon: SVG_OPEN + '<path d="M12 3l5 6h-3l4 5h-4v6h-4v-6H6l4-5H7z"/>' + SVG_CLOSE
+        }
+      };
+      var SHIFT_ICON = SVG_OPEN + '<path d="M12 4l8 8h-5v8H9v-8H4z"/>' + SVG_CLOSE;
+      var BACKSPACE_ICON = SVG_OPEN + '<path d="M21 6H9l-6 6 6 6h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/><path d="M14 10l-4 4M10 10l4 4"/>' + SVG_CLOSE;
+
+      var STEP_KEYS = ['step_name', 'step_appt', 'step_time'];
+
+      function $(id) { return document.getElementById(id); }
+
+      // Shrinks <main> just enough to fit the current screen's content in the space under the
+      // header, so the kiosk never needs to scroll. Re-measures from scratch each time, so it
+      // grows back to full size automatically once the content is short enough again.
+      var mainEl;
+      function fitContent() {
+        if (!mainEl) mainEl = document.querySelector('main');
+        mainEl.style.transform = 'none';
+        requestAnimationFrame(function () {
+          var available = mainEl.clientHeight;
+          var natural = mainEl.scrollHeight;
+          if (available > 0 && natural > available) {
+            // Never shrink past half size: past that, touch targets stop being usable, and
+            // something else is wrong (e.g. far too many services) rather than a minor overflow.
+            var scale = Math.max(0.5, available / natural);
+            mainEl.style.transform = 'scale(' + scale.toFixed(4) + ')';
+          }
+        });
+      }
+
+      function t(key) {
+        return (T[LANG] && T[LANG][key]) || T.en[key] || key;
+      }
+
+      function svcName(s) {
+        return LANG === 'es' && SERVICE_ES[s.code] ? SERVICE_ES[s.code].name : s.name;
+      }
+
+      function svcDesc(code) {
+        if (LANG === 'es' && SERVICE_ES[code]) return SERVICE_ES[code].description;
+        return (SERVICE_DETAILS[code] || {}).description || '';
+      }
+
+      function isAppointment() {
+        return !!service && service.code === APPOINTMENT_CODE;
+      }
+
+      // Sets every element marked with data-i18n, and the parts that are built in code.
+      function applyLanguage() {
+        document.documentElement.lang = LANG;
+        document.querySelectorAll('[data-i18n]').forEach(function (el) {
+          el.textContent = t(el.getAttribute('data-i18n'));
+        });
+        buildKeys();
+        renderName();
+        var onTime = !$('step-time').classList.contains('hidden');
+        renderSteps(onTime ? 2 : stage === 'host' ? 1 : 0);
+        if (servicesCache) renderServices();
+        $('lang-toggle').textContent = LANG === 'en' ? 'Español' : 'English';
+        refreshCurrentStep();
+      }
+
+      // Re-applies the language to the step on screen, keeping what the visitor has entered.
+      function refreshCurrentStep() {
+        if (!$('step-done').classList.contains('hidden')) $('done-ahead').textContent = doneAhead(lastAhead);
+        if (!service) return;
+        $('chosen').textContent = svcName(service);
+        if (!$('step-name').classList.contains('hidden')) {
+          $('name-title').textContent = t(stage === 'host' ? 'title_host' : 'title_name');
+          $('name-sub').textContent = t(stage === 'host' ? 'sub_host' : 'sub_name');
+          $('submit-label').textContent = stage === 'name' && !isAppointment() ? t('btn_join') : t('btn_next');
+          if (stage === 'host') $('name-summary').textContent = t('checking_in') + ' ' + customerName;
+        }
+        if (!$('step-time').classList.contains('hidden')) {
+          var chosenTime = apptTime;
+          buildTimeSlots();
+          if (chosenTime) selectTime(chosenTime);
+        }
+        fitContent();
+      }
+
+      function show(stepId) {
+        ['step-welcome', 'step-service', 'step-name', 'step-time', 'step-done', 'step-unavailable'].forEach(function (id) {
+          var el = $(id);
+          var wasHidden = el.classList.contains('hidden');
+          var showing = id === stepId;
+          el.classList.toggle('hidden', !showing);
+          if (showing && wasHidden) {
+            el.classList.remove('step-enter');
+            void el.offsetWidth; // restart the animation
+            el.classList.add('step-enter');
+          }
+        });
+        fitContent();
+      }
+
+      function scheduleReset(ms) {
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(reset, ms);
+      }
+
+      // Back to the service list, keeping the chosen language.
+      function backToServices() {
+        clearTimeout(resetTimer);
+        service = null;
+        stage = 'name';
+        name = '';
+        customerName = '';
+        hostName = '';
+        apptTime = '';
+        caps = false;
+        $('name-error').textContent = '';
+        $('step-name').classList.remove('host-mode');
+        show('step-service');
+        scheduleReset(IDLE_MS);
+      }
+
+      // Back to the welcome screen so the next visitor can choose a language.
+      function reset() {
+        clearTimeout(resetTimer);
+        service = null;
+        stage = 'name';
+        name = '';
+        customerName = '';
+        hostName = '';
+        apptTime = '';
+        caps = false;
+        LANG = 'en';
+        $('name-error').textContent = '';
+        $('time-error').textContent = '';
+        $('service-error').textContent = '';
+        $('step-name').classList.remove('host-mode');
+        applyLanguage();
+        show('step-welcome');
+      }
+
+      // Builds one key. html = true when the label is an SVG icon.
+      function key(label, onPress, cls, html) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'key' + (cls ? ' ' + cls : '');
+        if (html) b.innerHTML = label; else b.textContent = label;
+        b.addEventListener('click', function () { onPress(); scheduleReset(IDLE_MS); });
+        return b;
+      }
+
+      function renderName() {
+        var box = $('name-display');
+        box.textContent = '';
+        if (name) {
+          box.appendChild(document.createTextNode(name));
+        } else {
+          var ph = document.createElement('span');
+          ph.className = 'ph';
+          ph.textContent = t(stage === 'host' ? 'ph_host' : 'ph_name');
+          box.appendChild(ph);
+        }
+        var caret = document.createElement('span');
+        caret.className = 'caret';
+        box.appendChild(caret);
+      }
+
+      function type(ch) {
+        if (name.length >= 60) return;
+        name += ch;
+        $('name-error').textContent = '';
+        renderName();
+      }
+
+      // Letters capitalize the first letter of each word and lowercase the rest, unless Shift (caps) is on.
+      function letter(c) {
+        var prev = name.slice(-1);
+        var startOfWord = !prev || /[\s\-’']/.test(prev);
+        type(caps || startOfWord ? c.toUpperCase() : c.toLowerCase());
+      }
+
+      function buildKeys() {
+        var keys = $('keys');
+        keys.textContent = '';
+
+        [ROWS[0], ROWS[1]].forEach(function (r) {
+          var row = document.createElement('div');
+          row.className = 'keyrow';
+          r.forEach(function (c) { row.appendChild(key(c, function () { letter(c); })); });
+          keys.appendChild(row);
+        });
+
+        var shiftBtn = key(SHIFT_ICON, function () {
+          caps = !caps;
+          shiftBtn.classList.toggle('on', caps);
+        }, 'action', true);
+        shiftBtn.classList.toggle('on', caps);
+        var row3 = document.createElement('div');
+        row3.className = 'keyrow';
+        row3.appendChild(shiftBtn);
+        ROWS[2].forEach(function (c) {
+          var isLetter = /[A-Z]/.test(c);
+          row3.appendChild(key(c, function () { if (isLetter) letter(c); else type(c); }));
+        });
+        row3.appendChild(key(BACKSPACE_ICON, function () { name = name.slice(0, -1); renderName(); }, 'action', true));
+        keys.appendChild(row3);
+
+        var row4 = document.createElement('div');
+        row4.className = 'keyrow';
+        row4.appendChild(key(t('space'), function () { type(' '); }, 'wide'));
+        keys.appendChild(row4);
+      }
+
+      function isMorning(time) { return /AM$/.test(time); }
+
+      // Morning and Afternoon groups. Tapping a time selects it; Continue confirms.
+      function buildTimeSlots() {
+        var box = $('time-grid');
+        box.textContent = '';
+        apptTime = '';
+        [
+          { title: t('morning'), slots: TIME_SLOTS.filter(isMorning) },
+          { title: t('afternoon'), slots: TIME_SLOTS.filter(function (x) { return !isMorning(x); }) }
+        ].forEach(function (g) {
+          if (!g.slots.length) return;
+          var wrap = document.createElement('div');
+          wrap.className = 'time-group';
+          var head = document.createElement('div');
+          head.className = 'time-group-head';
+          var title = document.createElement('span');
+          title.textContent = g.title;
+          var range = document.createElement('span');
+          range.className = 'time-group-range';
+          range.textContent = g.slots[0] + ' – ' + g.slots[g.slots.length - 1];
+          head.appendChild(title);
+          head.appendChild(range);
+          var grid = document.createElement('div');
+          grid.className = 'time-grid';
+          g.slots.forEach(function (time) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'time-slot';
+            b.textContent = time;
+            b.addEventListener('click', function () { selectTime(time); scheduleReset(IDLE_MS); });
+            grid.appendChild(b);
+          });
+          wrap.appendChild(head);
+          wrap.appendChild(grid);
+          box.appendChild(wrap);
+        });
+        $('time-continue').disabled = true;
+      }
+
+      function selectTime(time) {
+        apptTime = time;
+        $('time-grid').querySelectorAll('.time-slot').forEach(function (b) {
+          b.classList.toggle('selected', b.textContent === time);
+        });
+        $('time-continue').disabled = false;
+        $('time-error').textContent = '';
+      }
+
+      function serviceTile(s, i) {
+        var details = SERVICE_DETAILS[s.code] || {};
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tile tile-enter' + (s.available ? '' : ' unavailable');
+        b.style.animationDelay = (i * 60) + 'ms';
+
+        var icon = document.createElement('span');
+        icon.className = 'icon';
+        if (details.icon) icon.innerHTML = details.icon;
+
+        var title = document.createElement('span');
+        title.className = 'tname';
+        title.textContent = svcName(s);
+
+        var desc = document.createElement('span');
+        desc.className = 'tdesc';
+        // The card always shows the normal description, even when closed — the full reason
+        // only appears on the full-screen message after tapping, so every tile looks consistent.
+        desc.textContent = svcDesc(s.code);
+
+        b.appendChild(icon);
+        b.appendChild(title);
+        b.appendChild(desc);
+        // Always tappable, even when closed: chooseService() itself decides what tapping it does.
+        b.addEventListener('click', function () { chooseService(s); });
+        return b;
+      }
+
+      // Builds the service cards in the current language, in 4-3-3 rows.
+      function renderServices() {
+        var tiles = $('tiles');
+        tiles.textContent = '';
+        servicesCache.forEach(function (s, i) {
+          if (i === 4 || i === 7) {
+            var brk = document.createElement('div');
+            brk.className = 'row-break';
+            tiles.appendChild(brk);
+          }
+          tiles.appendChild(serviceTile(s, i));
+        });
+      }
+
+      // A short fingerprint of what matters for display, so a poll/push that changes nothing
+      // doesn't re-render the tiles (and restart their entrance animation) for no reason.
+      function servicesSignature(list) {
+        return list.map(function (s) { return s.code + ':' + (s.available ? 1 : 0) + ':' + (s.unavailableMessage || ''); }).join('|');
+      }
+      var lastServicesSig = '';
+
+      async function loadServices() {
+        try {
+          var res = await fetch(BASE + 'api/services');
+          if (!res.ok) throw new Error('Could not load services');
+          var list = await res.json();
+          var sig = servicesSignature(list);
+          var changed = sig !== lastServicesSig;
+          servicesCache = list;
+          lastServicesSig = sig;
+          return changed;
+        } catch (err) {
+          $('service-error').textContent = t('err_services');
+          return false;
+        }
+      }
+
+      // Keeps service availability live: without this, a service closed from Manage Services
+      // would still look open on a kiosk that had already loaded the page. Only re-renders the
+      // tiles (and only while the service list is on screen) when something actually changed,
+      // so it doesn't interrupt someone partway through checking in.
+      async function refreshServices() {
+        var changed = await loadServices();
+        if (changed && !$('step-service').classList.contains('hidden')) renderServices();
+      }
+
+      function chooseLanguage(lang) {
+        LANG = lang;
+        applyLanguage();
+        if (!servicesCache) $('service-error').textContent = t('err_services');
+        show('step-service');
+      }
+
+      // Moves to a stage, saving what was typed on the stage being left.
+      function enterStage(next) {
+        if (stage === 'name') customerName = name;
+        if (stage === 'host') hostName = name;
+        stage = next;
+        name = next === 'name' ? customerName : next === 'host' ? hostName : '';
+        caps = false;
+        $('name-error').textContent = '';
+        $('name-title').textContent = t(next === 'host' ? 'title_host' : 'title_name');
+        $('name-sub').textContent = t(next === 'host' ? 'sub_host' : 'sub_name');
+        $('submit-label').textContent = next === 'name' && !isAppointment() ? t('btn_join') : t('btn_next');
+        renderName();
+        $('keys').querySelectorAll('.key.on').forEach(function (k) { k.classList.remove('on'); });
+        $('step-name').classList.toggle('host-mode', next === 'host');
+        renderSteps(next === 'host' ? 1 : 0);
+        var summary = $('name-summary');
+        summary.classList.toggle('hidden', next !== 'host');
+        summary.textContent = next === 'host' ? t('checking_in') + ' ' + customerName : '';
+        show('step-name');
+      }
+
+      // Shows progress through the appointment steps. Hidden for other services.
+      function renderSteps(current) {
+        ['steps', 'steps-time'].forEach(function (id) {
+          var box = $(id);
+          box.textContent = '';
+          box.classList.toggle('hidden', !isAppointment());
+          STEP_KEYS.forEach(function (key, i) {
+            var s = document.createElement('span');
+            s.className = 'step' + (i < current ? ' done' : i === current ? ' current' : '');
+            s.textContent = (i < current ? '✓ ' : (i + 1) + '. ') + t(key);
+            box.appendChild(s);
+          });
+        });
+      }
+
+      // A closed service still responds to a tap, with a full-screen explanation, rather than
+      // doing nothing — a dimmed tile alone is easy to miss, especially from a kiosk's viewing
+      // distance, and this also catches the rare case where the tile was stale by a few seconds.
+      function showUnavailable(s) {
+        $('unavail-name').textContent = svcName(s);
+        $('unavail-sub').textContent = t('unavailable_sub');
+        $('unavail-message').textContent = s.unavailableMessage || '';
+        show('step-unavailable');
+        scheduleReset(IDLE_MS);
+      }
+
+      function chooseService(s) {
+        if (!s.available) { showUnavailable(s); return; }
+        service = s;
+        customerName = '';
+        hostName = '';
+        apptTime = '';
+        $('chosen').textContent = svcName(s);
+        $('chosen-icon').innerHTML = (SERVICE_DETAILS[s.code] || {}).icon || '';
+        $('host-label').textContent = '';
+        enterStage('name');
+        scheduleReset(IDLE_MS);
+      }
+
+      // The main button on the name and host screens.
+      function next() {
+        var typed = name.trim();
+        if (stage === 'name') {
+          if (!typed) { $('name-error').textContent = t('err_name'); return; }
+          customerName = typed;
+          if (isAppointment()) enterStage('host');
+          else submit();
+          return;
+        }
+        if (stage === 'host') {
+          if (!typed) { $('name-error').textContent = t('err_host'); return; }
+          hostName = typed;
+          $('host-label').textContent = hostName;
+          buildTimeSlots();
+          $('time-error').textContent = '';
+          renderSteps(2);
+          show('step-time');
+        }
+      }
+
+      function doneAhead(n) {
+        if (n === 0) return t('done_next');
+        if (n === 1) return t('done_one');
+        return t('done_many').replace('{n}', n);
+      }
+
+      async function submit() {
+        if (busy) return;
+        busy = true;
+        $('submit').disabled = true;
+        $('time-grid').querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        var body = { serviceId: service.code, name: customerName };
+        if (isAppointment()) body.appointment = { with: hostName, time: apptTime };
+        try {
+          var res = await fetch(BASE + 'api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          var data = await res.json().catch(function () { return {}; });
+          // Shows the server's own message when there is one (e.g. why a service just closed),
+          // since those are specific and worth seeing; falls back to the generic message otherwise.
+          if (!res.ok) throw new Error(data.error || t('err_generic'));
+          $('done-name').textContent = data.customerName;
+          lastAhead = data.peopleAhead;
+          $('done-ahead').textContent = doneAhead(lastAhead);
+          show('step-done');
+          scheduleReset(DONE_MS);
+        } catch (err) {
+          var onTimeStep = !$('step-time').classList.contains('hidden');
+          $(onTimeStep ? 'time-error' : 'name-error').textContent = err.message;
+        } finally {
+          busy = false;
+          $('submit').disabled = false;
+          $('time-grid').querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+        }
+      }
+
+      document.querySelectorAll('.lang-btn').forEach(function (b) {
+        b.addEventListener('click', function () { chooseLanguage(b.getAttribute('data-lang')); scheduleReset(IDLE_MS); });
+      });
+      $('lang-toggle').addEventListener('click', function () {
+        LANG = LANG === 'en' ? 'es' : 'en';
+        applyLanguage();
+        scheduleReset(IDLE_MS);
+      });
+      $('back').addEventListener('click', function () {
+        if (stage === 'host') enterStage('name');
+        else backToServices();
+      });
+      $('submit').addEventListener('click', function () { next(); scheduleReset(IDLE_MS); });
+      $('time-back').addEventListener('click', function () { enterStage('host'); });
+      $('time-continue').addEventListener('click', function () {
+        if (!apptTime) { $('time-error').textContent = t('err_time'); return; }
+        scheduleReset(IDLE_MS);
+        submit();
+      });
+      $('done-btn').addEventListener('click', reset);
+      $('unavail-back').addEventListener('click', function () { backToServices(); });
+
+      // Physical keyboard support, for a kiosk with one attached.
+      document.addEventListener('keydown', function (e) {
+        if ($('step-name').classList.contains('hidden')) return;
+        if (e.key === 'Enter') { next(); e.preventDefault(); return; }
+        if (e.key === 'Backspace') { name = name.slice(0, -1); renderName(); e.preventDefault(); return; }
+        if (/^[A-Za-z]$/.test(e.key)) { letter(e.key); return; }
+        if (/^[ '\-’]$/.test(e.key)) type(e.key);
+      });
+
+      window.addEventListener('resize', fitContent);
+      var logoImg = document.querySelector('.logo');
+      if (logoImg) logoImg.addEventListener('load', fitContent);
+
+      // Live service availability: instant via Socket.IO when it gets through, with a 15-second
+      // poll as a fallback for hosts where it doesn't (same pattern as the staff and monitor pages).
+      if (window.io) {
+        io({ path: BASE + 'socket.io' }).on('queue:changed', refreshServices);
+      }
+      setInterval(refreshServices, 15000);
+
+      // The kiosk starts once its timers are known from the server.
+      function applyKioskSettings(s) {
+        document.documentElement.setAttribute('data-theme', s.kiosk_theme);
+        IDLE_MS = s.kiosk_idle_seconds * 1000;
+        DONE_MS = s.kiosk_done_seconds * 1000;
+      }
+      window.appSettingsReady.then(function (s) {
+        applyKioskSettings(s);
+        window.watchAppSettings(applyKioskSettings);
+        loadServices().then(function () {
+          if (!$('step-service').classList.contains('hidden')) renderServices();
+        });
+        applyLanguage();
+        show('step-welcome');
+      });
+    })();
+  </script>
+</body>
+</html>

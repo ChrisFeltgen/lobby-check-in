@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My account · Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="theme.js"></script>
+  <style>
+    main { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    h1 { margin: 0; font-size: 24px; }
+    h2 { margin: 0 0 4px; font-size: 18px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+    .muted { color: var(--muted); font-size: 14px; margin: 0; }
+    form { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+    input { min-height: 40px; padding: 8px 10px; font-size: 16px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    .msg { min-height: 20px; margin: 0; font-size: 14px; color: var(--danger); }
+    .msg.ok { color: #2e9e5b; }
+    .hidden { display: none !important; }
+
+    /* Header bar, the same as the queue portal and Management */
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: linear-gradient(90deg, #0a4670 0%, #0b6a9c 100%); color: #fff; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .logo-wrap { background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; }
+    .logo { max-height: 40px; width: auto; display: block; }
+    .top h1 { margin: 0; font-size: 22px; font-weight: 700; white-space: nowrap; }
+    .top .sub { margin: 2px 0 0; font-size: 14px; opacity: 0.85; }
+    .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    /* Header links and buttons share one height and look: links are plain text with a highlight on hover. */
+    .top-actions a { color: #fff; text-decoration: none; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: background-color 0.12s ease; }
+    .top-actions a:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions a[aria-current="page"] { background: rgba(255, 255, 255, 0.2); }
+    .top-actions button.ghost { height: 38px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 15px; }
+    .top-actions button.ghost:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions .divider { width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.3); margin: 0 2px; }
+    button.ghost { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.55); min-height: 36px; padding: 6px 14px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+
+    /* Main tabs: text tabs on a divider line, with an accent underline on the open one (as on Management). */
+    .tabs { display: flex; gap: 6px; max-width: 1000px; margin: 12px auto 0; padding: 0 20px; border-bottom: 1px solid var(--border); }
+    .tab-btn { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px 9px; min-height: 0; margin-bottom: -1px; font-weight: 600; font-size: 15px; cursor: pointer; transition: color 0.12s ease, border-color 0.12s ease; }
+    .tab-btn:hover { color: var(--fg); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* Each tab's content sits in a narrower column so forms stay easy to read. */
+    .tab-panel { max-width: 560px; display: flex; flex-direction: column; gap: 18px; }
+    .notice { border-color: #d9a400; background: color-mix(in srgb, #d9a400 10%, var(--card)); }
+    .queue-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 16px; margin-top: 14px; }
+    .queue-picks label { flex-direction: row; align-items: center; gap: 10px; font-size: 15px; color: var(--fg); }
+    .queue-picks input { min-height: 0; width: 18px; height: 18px; padding: 0; margin: 0; flex: none; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .actions button.secondary { min-height: 40px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; font-size: 15px; }
+    .actions button.primary { min-height: 40px; }
+    .field-note { margin: 0; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <div>
+        <p class="org-label" data-org-name hidden></p>
+        <h1>My account</h1>
+        <p class="sub" id="signed-in"></p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a href="queue.html">Queue Portal</a>
+      <a id="manage-link" class="hidden" href="manage.html">Management</a>
+      <a href="account.html" aria-current="page">My account</a>
+      <button id="signout" class="ghost" type="button">Sign out</button>
+      <span class="divider"></span>
+      <button id="theme-toggle" class="ghost" type="button"><span class="theme-icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="theme-icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="5"/></svg></span></button>
+    </div>
+  </header>
+
+  <!-- Shown when nobody is signed in on this browser. -->
+  <main id="signed-out" class="hidden">
+    <section class="card">
+      <h2>Sign in first</h2>
+      <p class="muted">You need to be signed in to change your account.</p>
+      <p><a href="index.html?next=account.html">Go to the sign-in page</a></p>
+    </section>
+  </main>
+
+  <div id="account-body" class="hidden">
+    <nav class="tabs" id="tabs">
+      <button class="tab-btn" data-tab="profile" type="button">Profile</button>
+      <button class="tab-btn" data-tab="password" type="button">Password</button>
+      <button class="tab-btn" data-tab="queues" type="button">Default queues</button>
+    </nav>
+
+    <main>
+      <!-- Profile -->
+      <div class="tab-panel" id="panel-profile">
+        <section class="card">
+          <h2>Profile</h2>
+          <p class="muted" id="role-line"></p>
+          <form id="profile-form">
+            <label>Display name
+              <input id="display-name" required maxlength="100" autocomplete="name">
+            </label>
+            <label>User ID (the name you sign in with)
+              <input id="user-id" required maxlength="40" autocomplete="username">
+            </label>
+            <p class="msg" id="profile-msg" role="status"></p>
+            <div><button class="primary" type="submit" id="profile-save">Save profile</button></div>
+          </form>
+        </section>
+      </div>
+
+      <!-- Password -->
+      <div class="tab-panel hidden" id="panel-password">
+        <section class="card notice hidden" id="force-note">
+          <h2>Choose a new password</h2>
+          <p class="muted">Your password was set by someone else. Choose your own before you continue to the queue portal or management.</p>
+        </section>
+
+        <section class="card">
+          <h2>Change password</h2>
+          <p class="muted"><span id="password-min">Checking the minimum length…</span> You'll stay signed in on this browser.</p>
+          <form id="password-form" autocomplete="off">
+            <label>Current password
+              <input id="current-password" type="password" required autocomplete="current-password">
+            </label>
+            <label>New password
+              <input id="new-password" type="password" required autocomplete="new-password">
+            </label>
+            <label>Confirm new password
+              <input id="confirm-password" type="password" required autocomplete="new-password">
+            </label>
+            <p class="msg" id="password-msg" role="status"></p>
+            <div><button class="primary" type="submit" id="password-save">Change password</button></div>
+          </form>
+        </section>
+      </div>
+
+      <!-- Default queues -->
+      <div class="tab-panel hidden" id="panel-queues">
+        <section class="card">
+          <h2>Default service queues</h2>
+          <p class="muted" id="queues-intro"></p>
+          <div class="queue-picks" id="queue-picks"></div>
+          <p class="msg" id="queues-msg" role="status"></p>
+          <div class="actions">
+            <button class="primary" type="button" id="queues-save">Save defaults</button>
+            <button class="secondary" type="button" id="queues-clear">Clear default</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="app-settings.js"></script>
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
+      var TABS = ['profile', 'password', 'queues'];
+
+      function $(id) { return document.getElementById(id); }
+
+      async function api(path, opts) {
+        opts = opts || {};
+        var res = await fetch(BASE + path, {
+          method: opts.method || 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: opts.body,
+          credentials: 'same-origin'
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.status === 401) { window.location.href = BASE + 'index.html?next=account.html'; throw new Error('Sign in required'); }
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      }
+
+      function setMsg(id, text, ok) {
+        var m = $(id);
+        m.textContent = text;
+        m.classList.toggle('ok', !!ok);
+      }
+
+      // ---- Tabs ----
+      // The open tab is kept in the address (?tab=...), so a refresh stays on the same tab.
+      function showTab(tab) {
+        TABS.forEach(function (t) {
+          $('panel-' + t).classList.toggle('hidden', t !== tab);
+        });
+        document.querySelectorAll('.tab-btn').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.tab === tab);
+        });
+        var params = new URLSearchParams(location.search);
+        params.set('tab', tab);
+        history.replaceState(null, '', location.pathname + '?' + params.toString());
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { showTab(btn.dataset.tab); });
+      });
+
+      // Open the tab named in the address; otherwise Password while a change is forced, or Profile.
+      var tabChosen = false;
+      function chooseFirstTab() {
+        if (tabChosen) return;
+        tabChosen = true;
+        var requested = new URLSearchParams(location.search).get('tab');
+        if (TABS.indexOf(requested) >= 0) showTab(requested);
+        else showTab(user && user.mustChangePassword ? 'password' : 'profile');
+      }
+
+      // ---- Profile and account state ----
+      var user = null;
+
+      function showUser(u) {
+        user = u;
+        $('signed-in').textContent = u.displayName + ' · ' + ROLE_LABEL[u.role];
+        $('manage-link').classList.toggle('hidden', u.role === 'staff');
+        $('display-name').value = u.displayName;
+        $('user-id').value = u.username;
+        $('role-line').textContent = 'Role: ' + ROLE_LABEL[u.role];
+        $('force-note').classList.toggle('hidden', !u.mustChangePassword);
+
+        $('account-body').classList.remove('hidden');
+        renderQueues();
+        chooseFirstTab();
+      }
+
+      $('profile-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        setMsg('profile-msg', '');
+        $('profile-save').disabled = true;
+        try {
+          var updated = await api('api/account', {
+            method: 'PATCH',
+            body: JSON.stringify({ displayName: $('display-name').value.trim(), username: $('user-id').value.trim() })
+          });
+          showUser(updated);
+          setMsg('profile-msg', 'Profile saved.', true);
+        } catch (error) {
+          setMsg('profile-msg', error.message);
+        } finally {
+          $('profile-save').disabled = false;
+        }
+      });
+
+      $('password-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        setMsg('password-msg', '');
+        var next = $('new-password').value;
+        if (next !== $('confirm-password').value) { setMsg('password-msg', 'The new passwords do not match.'); return; }
+        $('password-save').disabled = true;
+        try {
+          await api('api/account/password', {
+            method: 'POST',
+            body: JSON.stringify({ currentPassword: $('current-password').value, newPassword: next })
+          });
+          $('password-form').reset();
+          if (user && user.mustChangePassword) {
+            // The forced change is done: carry on to the queue portal.
+            user.mustChangePassword = false;
+            $('force-note').classList.add('hidden');
+            setMsg('password-msg', 'Password changed. Taking you to the queue portal…', true);
+            setTimeout(function () { window.location.href = BASE + 'queue.html'; }, 1200);
+          } else {
+            setMsg('password-msg', 'Password changed.', true);
+          }
+        } catch (error) {
+          setMsg('password-msg', error.message);
+        } finally {
+          $('password-save').disabled = false;
+        }
+      });
+
+      // ---- Default service queues ----
+      // Appointment Check-In is always watched in the queue portal, so it's ticked and can't be unticked here.
+      var ALWAYS_WATCHED = 'AC';
+      var services = [];
+
+      function renderQueues() {
+        var saved = user && Array.isArray(user.defaultQueues) ? user.defaultQueues : null;
+        $('queues-intro').textContent = saved
+          ? 'Queues you watch by default. The queue portal applies them each time you sign in, on any computer. Changes take effect at your next sign-in.'
+          : 'No default saved. Tick the queues you want to watch by default, then save.';
+        var box = $('queue-picks');
+        box.textContent = '';
+        services.forEach(function (svc) {
+          var always = svc.code === ALWAYS_WATCHED;
+          var label = document.createElement('label');
+          var input = document.createElement('input');
+          input.type = 'checkbox';
+          input.value = svc.code;
+          input.checked = always || (saved !== null && saved.indexOf(svc.code) >= 0);
+          input.disabled = always;
+          label.appendChild(input);
+          label.appendChild(document.createTextNode(svc.name + (always ? ' (always watched)' : '')));
+          box.appendChild(label);
+        });
+        $('queues-clear').disabled = saved === null;
+      }
+
+      function chosenQueues() {
+        return Array.prototype.filter.call($('queue-picks').querySelectorAll('input'), function (i) { return i.checked; })
+          .map(function (i) { return i.value; });
+      }
+
+      async function saveQueues(codes) {
+        var result = await api('api/account/default-queues', { method: 'PUT', body: JSON.stringify({ codes: codes }) });
+        user.defaultQueues = result.defaultQueues;
+        renderQueues();
+      }
+
+      $('queues-save').addEventListener('click', async function () {
+        setMsg('queues-msg', '');
+        $('queues-save').disabled = true;
+        try {
+          await saveQueues(chosenQueues());
+          setMsg('queues-msg', 'Defaults saved.', true);
+        } catch (error) {
+          setMsg('queues-msg', error.message);
+        } finally {
+          $('queues-save').disabled = false;
+        }
+      });
+
+      $('queues-clear').addEventListener('click', async function () {
+        setMsg('queues-msg', '');
+        try {
+          await saveQueues(null);
+          setMsg('queues-msg', 'Default cleared. The queue portal keeps the list it already has until your next sign-in.', true);
+        } catch (error) {
+          setMsg('queues-msg', error.message);
+        }
+      });
+
+      $('signout').addEventListener('click', function () {
+        fetch(BASE + 'api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+          .catch(function () {})
+          .then(function () { window.location.href = BASE + 'index.html'; });
+      });
+
+      // The minimum length comes from Settings → Security and sessions.
+      window.appSettingsReady.then(function (s) {
+        var min = s.min_password_length;
+        $('new-password').minLength = min;
+        $('confirm-password').minLength = min;
+        $('password-min').textContent = 'Minimum password length is ' + min + ' characters.';
+      });
+
+      api('api/services').then(function (list) {
+        services = list;
+        renderQueues();
+      }).catch(function () {});
+
+      api('api/auth/me').then(showUser).catch(function () {
+        $('signed-out').classList.remove('hidden');
+      });
+    })();
+  </script>
+</body>
+</html>

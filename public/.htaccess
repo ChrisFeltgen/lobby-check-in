@@ -1,0 +1,7 @@
+# Ask browsers to re-check HTML pages on every visit, so an updated page is never replaced by an
+# older copy kept in the browser cache. Read by Apache-style hosts and LiteSpeed (scrapcraft.dev).
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

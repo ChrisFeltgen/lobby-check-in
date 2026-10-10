@@ -1,0 +1,15 @@
+# Installed packages: restored with npm install
+node_modules/
+
+# Real settings and secrets: never commit these
+.env
+
+# Host and local logs
+*.log
+
+# Local tool settings
+.claude/
+
+# Archives and backups
+*.tar.gz
+*.sql.gz

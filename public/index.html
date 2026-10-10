@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="theme.js"></script>
+  <style>
+    main { max-width: 640px; margin: 0 auto; padding: 32px 16px; display: flex; flex-direction: column; gap: 18px; }
+    h1 { margin: 0; font-size: 26px; }
+    h2 { margin: 0 0 4px; font-size: 20px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .top-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    form.signin { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+    form.signin label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+    form.signin input { min-height: 40px; padding: 8px 10px; font-size: 16px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    .msg { min-height: 20px; margin: 0; font-size: 14px; color: var(--danger); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .actions .btn, .actions button { flex: 1; min-width: 160px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+    .btn { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); text-decoration: none; font-weight: 600; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    .link-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .link-list a { display: block; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--fg); text-decoration: none; }
+    .link-list a:hover { border-color: var(--accent); }
+    .link-list strong { display: block; font-size: 16px; }
+    .link-list span { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+    .hidden { display: none !important; }
+    /* Header bar, the same as the other pages */
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: linear-gradient(90deg, #0a4670 0%, #0b6a9c 100%); color: #fff; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .logo-wrap { background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; }
+    .logo { max-height: 40px; width: auto; display: block; }
+    .top h1 { margin: 0; font-size: 22px; font-weight: 700; white-space: nowrap; color: #fff; }
+    .top .sub { margin: 2px 0 0; font-size: 14px; opacity: 0.85; }
+    .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .top-actions a { color: #fff; text-decoration: none; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: background-color 0.12s ease; }
+    .top-actions a:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions button.ghost { height: 38px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 15px; }
+    .top-actions button.ghost:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions .divider { width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.3); margin: 0 2px; }
+    button.ghost { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.55); min-height: 36px; padding: 6px 14px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    .top-actions #theme-toggle { flex: none; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <div>
+        <p class="org-label" data-org-name hidden></p>
+        <h1>Lobby Check-In</h1>
+        <p class="sub">Staff sign-in</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a href="queue.html">Queue Portal</a>
+      <a id="header-manage" class="hidden" href="manage.html">Management</a>
+      <a href="account.html">My account</a>
+      <button id="header-signout" class="ghost hidden" type="button">Sign out</button>
+      <span class="divider"></span>
+      <button id="theme-toggle" class="ghost" type="button" aria-label="Switch to dark mode" title="Switch to dark mode"><span class="theme-icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="theme-icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="5"/></svg></span></button>
+    </div>
+  </header>
+  <main>
+    <!-- Staff sign-in: shown when nobody is signed in on this browser. -->
+    <section class="card" id="signin-card">
+      <h2>Staff sign in</h2>
+      <p class="muted">Sign in with your own account to use the queue portal or management.</p>
+      <form class="signin" id="signin-form" autocomplete="on">
+        <label>User ID
+          <input id="username" required maxlength="40" autocomplete="username">
+        </label>
+        <label>Password
+          <input id="password" type="password" required autocomplete="current-password">
+        </label>
+        <label>Counter name (for example "Window 1")
+          <input id="counter" required maxlength="20" autocomplete="off">
+        </label>
+        <p class="msg" id="signin-error" role="alert"></p>
+        <button class="primary" type="submit" id="signin-submit">Sign in</button>
+      </form>
+    </section>
+
+    <!-- Shown once signed in. Signing in itself takes you straight to the queue portal. -->
+    <section class="card hidden" id="signed-in-card">
+      <h2>Signed in</h2>
+      <p class="muted" id="signed-in-as"></p>
+      <div class="actions">
+        <a class="btn primary" href="queue.html" id="open-portal">Open queue portal</a>
+        <a class="btn secondary hidden" href="manage.html" id="open-manage">Management</a>
+        <a class="btn secondary" href="account.html">My account</a>
+        <button class="secondary" type="button" id="signout">Sign out</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Public screens</h2>
+      <p class="muted">No sign-in needed.</p>
+      <div class="link-list">
+        <a href="kiosk.html">
+          <strong>Customer kiosk</strong>
+          <span>Touch screen where customers check in for a service</span>
+        </a>
+        <a href="monitor.html?panel=left">
+          <strong>Queue monitor: Left</strong>
+          <span>Planning &amp; Zoning, Code Compliance, Business Tax Receipts</span>
+        </a>
+        <a href="monitor.html?panel=right">
+          <strong>Queue monitor: Right</strong>
+          <span>Building Dept., Records &amp; Alarms, Appointment Check-In</span>
+        </a>
+        <a href="monitor.html">
+          <strong>Queue monitor: All services</strong>
+          <span>Every department on one screen</span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
+
+      function $(id) { return document.getElementById(id); }
+
+      // Same request pattern the other pages use: JSON in, JSON out, errors carry the server's message.
+      async function api(path, opts) {
+        opts = opts || {};
+        var res = await fetch(BASE + path, {
+          method: opts.method || 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: opts.body,
+          credentials: 'same-origin'
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      }
+
+      // Other staff pages send people here to sign in, with ?next= naming the page to return to.
+      // Only the staff pages are accepted, so the parameter can't send anyone elsewhere.
+      var NEXT_PAGES = ['queue.html', 'manage.html', 'account.html'];
+      function nextPage() {
+        var next = new URLSearchParams(location.search).get('next');
+        return NEXT_PAGES.indexOf(next) >= 0 ? next : null;
+      }
+
+      function showSignedIn(user) {
+        if (user.mustChangePassword) { window.location.href = BASE + 'account.html'; return; }
+        // Arrived here to sign in, and already signed in: carry on to the page they wanted.
+        if (nextPage()) { window.location.href = BASE + nextPage(); return; }
+        $('signin-card').classList.add('hidden');
+        $('signed-in-card').classList.remove('hidden');
+        $('signed-in-as').textContent = 'Signed in as ' + user.displayName + ' (' + ROLE_LABEL[user.role] + ').';
+        // Management is for Managers and Admins only.
+        $('open-manage').classList.toggle('hidden', user.role === 'staff');
+        $('header-manage').classList.toggle('hidden', user.role === 'staff');
+        $('header-signout').classList.remove('hidden');
+      }
+
+      function showSignedOut() {
+        $('header-manage').classList.add('hidden');
+        $('header-signout').classList.add('hidden');
+        $('signed-in-card').classList.add('hidden');
+        $('signin-card').classList.remove('hidden');
+        $('signin-error').textContent = '';
+        $('username').focus();
+      }
+
+      $('signin-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var err = $('signin-error');
+        var counter = $('counter').value.trim();
+        err.textContent = '';
+        if (!counter) { err.textContent = 'Enter a counter name.'; return; }
+        $('signin-submit').disabled = true;
+        try {
+          var user = await api('api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username: $('username').value.trim(), password: $('password').value })
+          });
+          // The queue portal reads the counter name from this browser, so save it before going there.
+          try { localStorage.setItem('staffCounter', counter); } catch (ignored) { /* storage unavailable */ }
+          // A forced password change comes first.
+          window.location.href = BASE + (user.mustChangePassword ? 'account.html' : (nextPage() || 'queue.html'));
+        } catch (error) {
+          err.textContent = error.message;
+          $('password').value = '';
+          $('signin-submit').disabled = false;
+        }
+      });
+
+      $('signout').addEventListener('click', function () {
+        api('api/auth/logout', { method: 'POST' }).catch(function () {}).then(showSignedOut);
+      });
+      $('header-signout').addEventListener('click', function () { $('signout').click(); });
+
+      // Already signed in on this browser? Offer the portal rather than sending them there unasked.
+      $('counter').value = (function () { try { return localStorage.getItem('staffCounter') || ''; } catch (e) { return ''; } })();
+      api('api/auth/me').then(showSignedIn).catch(showSignedOut);
+    })();
+  </script>
+  <script src="app-settings.js"></script>
+</body>
+</html>

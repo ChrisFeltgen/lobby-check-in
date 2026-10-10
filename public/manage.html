@@ -1,0 +1,1862 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Management · Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="theme.js"></script>
+  <style>
+    body { font-size: 15px; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+    button { font-size: 15px; min-height: 36px; padding: 6px 14px; border-radius: 8px; }
+    button.primary { background: #1f6feb; color: #fff; border: 0; font-weight: 600; }
+    button.ghost { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.55); }
+    button.secondary { font-weight: 500; }
+    button.danger { background: var(--danger); color: #fff; border: 0; }
+    .card, .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: linear-gradient(90deg, #0a4670 0%, #0b6a9c 100%); color: #fff; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .logo-wrap { background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; }
+    .logo { max-height: 40px; width: auto; display: block; }
+    .top h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    .top .sub { margin: 2px 0 0; font-size: 14px; opacity: 0.85; }
+    .top-actions { display: flex; gap: 10px; align-items: center; }
+    /* Header links and buttons share one height and look: links are plain text with a highlight on hover. */
+    .top-actions a { color: #fff; text-decoration: none; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: background-color 0.12s ease; }
+    .top-actions a:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions a[aria-current="page"] { background: rgba(255, 255, 255, 0.2); }
+    /* Narrow windows: the header wraps, and the links stay together below the title. */
+    @media (max-width: 720px) {
+      .top { flex-wrap: wrap; }
+      .top-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+    }
+    .top-actions button.ghost { height: 38px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 15px; border: 1px solid rgba(255, 255, 255, 0.55); }
+    .top-actions button.ghost:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions .divider { width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.3); margin: 0 2px; }
+
+    /* Tabs: which ones exist is fixed, but which the signed-in account can actually use is
+       permission-gated at start() the same way the page itself is — see showTab/start. */
+    /* Main tabs: text tabs on a divider line, with an accent underline on the open one. */
+    .tabs { display: flex; gap: 6px; max-width: 1000px; margin: 12px auto 0; padding: 0 20px; border-bottom: 1px solid var(--border); }
+    .tab-btn { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px 9px; min-height: 0; margin-bottom: -1px; font-weight: 600; font-size: 15px; cursor: pointer; transition: color 0.12s ease, border-color 0.12s ease; }
+    .tab-btn:hover { color: var(--fg); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    main { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    .tab-panel { display: flex; flex-direction: column; gap: 16px; }
+    .panel { padding: 16px 18px; }
+    .panel h2 { margin: 0 0 12px; font-size: 16px; }
+    .msg { min-height: 20px; margin: 0; color: var(--danger); font-size: 14px; }
+    .notice { padding: 40px 20px; text-align: center; }
+    .notice a { color: #1f6feb; }
+
+    form.inline { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+    form.inline label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+    /* Department lists span the whole row, with their choices in as many columns as fit. */
+    .save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; padding: 12px 0; background: var(--bg); border-top: 1px solid var(--border); }
+    .save-bar .msg { margin: 0; }
+    .settings-columns { display: flex; flex-direction: column; gap: 18px; }
+    .settings-columns > .settings-group { min-width: 0; }
+    .key-picks { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 4px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+    .key-picks .check-row { font-size: 14px; min-width: 0; line-height: 1.3; }
+    .key-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 24px; }
+    .key-row > .key-field { flex: 1 1 280px; min-width: 0; }
+    .key-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); min-width: 0; }
+    .field-label { font-size: 14px; color: var(--muted); }
+    .logo-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .logo-preview { max-height: 48px; width: auto; background: #fff; border-radius: 6px; padding: 4px 8px; }
+    .logo-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .audit-search { width: 100%; max-width: 360px; min-height: 38px; margin: 0 0 12px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    form.inline input, form.inline select { min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    /* A checkbox with its label beside it, not the full-size text-field style above. */
+    form.inline label.check-row { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); }
+    form.inline label.check-row input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: none; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .role-pill { font-size: 12px; font-weight: 700; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
+    .role-staff { background: #e7f0ff; color: #0a3d8f; }
+    .role-manager { background: #fdf0d5; color: #9a5b00; }
+    .role-admin { background: #f4d9e4; color: #8a1550; }
+    .inactive { opacity: 0.55; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .row-actions select { min-height: 32px; font-size: 13px; }
+    .row-actions button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+
+    .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .panel-head h2 { margin: 0; font-size: 18px; }
+    .panel-head .route { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+    .status-pill { font-size: 12px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+    .status-open { background: #dcf3e3; color: #166a37; }
+    .status-closed { background: #fdf0d5; color: #9a5b00; }
+    .current-reason { margin: 8px 0 0; font-size: 14px; color: #9a5b00; }
+
+    .override-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+    .inline-form { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
+    .inline-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+    .inline-form input, .inline-form select { min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); }
+    .inline-form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .inline-form .checks { display: flex; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+    .inline-form .checks label { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; color: var(--fg); }
+    .inline-form .actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .inline-form .err { margin: 0; min-height: 18px; font-size: 14px; color: var(--danger); }
+
+    .schedules-head { margin: 16px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
+    .schedule-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .schedule-when { font-size: 14px; font-weight: 600; }
+    .schedule-message { font-size: 13px; color: var(--muted); }
+    .schedule-actions { display: flex; gap: 6px; }
+    .schedule-actions button { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+    /* Delete here is destructive, but a light tint keeps it from dominating the card. */
+    .schedule-actions button.danger, .row-actions button.danger { background: color-mix(in srgb, var(--danger) 12%, var(--card)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--card)); }
+    .schedule-actions button.danger:hover, .row-actions button.danger:hover { background: color-mix(in srgb, var(--danger) 20%, var(--card)); }
+    .schedule-row.paused { opacity: 0.5; }
+    .schedule-row.last-row { border-bottom: 0; }
+    .empty { font-size: 14px; color: var(--muted); padding: 4px 0; }
+
+    /* Services tab: one card per service, in a grid so the list needs less scrolling. */
+    #panel-services { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+    .svc-card { border-left: 4px solid var(--muted); display: flex; flex-direction: column; gap: 12px; }
+    .svc-card > div:empty { display: none; }
+    .svc-card.is-open { border-left-color: #2e9e5b; }
+    .svc-card.is-closed { border-left-color: var(--danger); }
+    .svc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .svc-title h2 { margin: 0; font-size: 17px; line-height: 1.25; }
+    .svc-route { margin-top: 3px; font-size: 13px; color: var(--muted); }
+    .closed-banner { font-size: 14px; line-height: 1.4; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--danger) 12%, var(--card)); color: var(--danger); }
+    .override-row { margin-top: 0; }
+    .health-ok { font-weight: 600; color: #2e9e5b; margin: 0 0 8px; }
+    .settings-group { display: flex; flex-direction: column; gap: 10px; }
+    .settings-group-title { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+    .settings-grid > .panel { margin: 0; }
+    .test-output { margin: 12px 0 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.4; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+    /* Inline name and User ID editing inside an accounts row: compact fields that fit the table. */
+    tr.editing td { vertical-align: middle; }
+    tr.editing input { width: 100%; min-width: 140px; min-height: 34px; padding: 4px 8px; font-size: 14px; box-sizing: border-box; border-radius: 6px; }
+    tr.editing .row-actions { white-space: nowrap; }
+    .edit-hint { font-size: 13px; color: var(--muted); }
+    /* Edit account window */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 60; }
+    .modal { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35); padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+    .modal h3 { margin: 0; font-size: 18px; }
+    .modal h4 { margin: 10px 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 12px; }
+    .modal label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+    .modal input, .modal select { min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    .modal label.check-row { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); }
+    .modal label.check-row input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; }
+    .modal .err { margin: 0; min-height: 18px; font-size: 14px; color: var(--danger); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    .modal .reset-row { display: flex; gap: 8px; align-items: center; }
+    .modal .reset-row input { flex: 1; min-width: 0; }
+    .modal .reset-row button { flex: none; min-height: 38px; }
+    .modal label.check-row { font-size: 13px; }
+    /* Fixed column widths: editing a row must not re-flow the other rows. */
+    .staff-table { table-layout: fixed; }
+    .staff-table th:nth-child(1) { width: 19%; }
+    .staff-table th:nth-child(2) { width: 16%; }
+    .staff-table th:nth-child(3) { width: 11%; }
+    .staff-table th:nth-child(4) { width: 9%; }
+    .staff-table th:nth-child(5) { width: 13%; }
+    .staff-table th:nth-child(6) { width: 32%; }
+    .schedules-head { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
+    .add-schedule { width: 100%; border-style: dashed; }
+    .override-options { display: flex; flex-direction: column; gap: 10px; }
+    .override-option { display: flex; align-items: center; gap: 12px; }
+    .override-option button { flex: none; min-width: 150px; }
+    .override-desc { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+
+    /* Reports dialog: opened from the header, one day at a time */
+    .report-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    .report-filters, .report-actions { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+    .report-actions button { min-height: 38px; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+    .report-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+    .report-head input { min-height: 36px; padding: 4px 8px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    .report-search { min-width: 200px; }
+    .report-body tr.person-total td { font-weight: 700; }
+    .report-body tr.service-row td { color: var(--muted); }
+    .report-body tr.service-row td:first-child { padding-left: 28px; }
+    .print-title { display: none; }
+    /* Printing: just the report, in black on white, without the controls. */
+    @media print {
+      body * { visibility: hidden; }
+      #panel-reports, #panel-reports * { visibility: visible; }
+      #panel-reports { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+      .report-head, .report-views, .report-export, .report-print, .report-search { display: none !important; }
+      .print-title { display: block !important; margin: 0 0 8px; font-size: 18pt; color: #000; }
+      .report-body, .panel { overflow: visible !important; background: #fff !important; color: #000 !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+      .report-body table, .report-body th, .report-body td, .report-summary { color: #000 !important; }
+      .report-body tr { page-break-inside: avoid; }
+    }
+    /* View switcher: one connected control, so the views read as a set of alternatives. */
+    .report-views { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; align-self: flex-start; }
+    .report-view { background: var(--card); border: 0; border-right: 1px solid var(--border); border-radius: 0; color: var(--fg); padding: 8px 14px; font-weight: 600; font-size: 14px; cursor: pointer; min-height: 38px; }
+    .report-view:last-child { border-right: 0; }
+    .report-view.active { background: var(--accent); color: #fff; }
+    .report-summary { font-size: 14px; color: var(--muted); margin: 0; }
+    .report-body { overflow-x: auto; }
+    .report-body table { font-size: 14px; }
+    .report-body td.r, .report-body th.r { text-align: right; font-variant-numeric: tabular-nums; }
+    .report-body tfoot td { font-weight: 700; border-bottom: 0; border-top: 1px solid var(--border); }
+    .bar-cell { min-width: 180px; }
+    .bar-line { display: flex; align-items: center; gap: 8px; }
+    .bar-track { flex: 1; height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; }
+    .bar-fill.arrivals { background: var(--accent); }
+    .bar-fill.served { background: #166a37; }
+    .bar-num { min-width: 28px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <div>
+        <p class="org-label" data-org-name hidden></p>
+        <h1>Management</h1>
+        <p class="sub" id="signed-in"></p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a href="queue.html">Queue Portal</a>
+      <a id="manage-link" href="manage.html" aria-current="page">Management</a>
+      <a href="account.html">My account</a>
+      <button id="signout" class="ghost" type="button">Sign out</button>
+      <span class="divider"></span>
+      <button id="theme-toggle" class="ghost" type="button"><span class="theme-icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="theme-icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="5"/></svg></span></button>
+    </div>
+  </header>
+
+  <nav class="tabs hidden" id="tabs">
+    <button class="tab-btn" data-tab="services" type="button">Services</button>
+    <button class="tab-btn" data-tab="staff" type="button">Staff</button>
+    <button class="tab-btn" data-tab="reports" type="button">Reports</button>
+    <button class="tab-btn" data-tab="settings" type="button">Settings</button>
+    <button class="tab-btn" data-tab="health" type="button">Health &amp; audit</button>
+  </nav>
+
+  <main id="app">
+    <p class="muted" style="padding:20px">Loading…</p>
+  </main>
+
+  <script src="app-settings.js"></script>
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      var state = { user: null, services: [], users: [], editing: null };
+      var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
+      var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      var NTH_LABELS = { '1': '1st', '2': '2nd', '3': '3rd', '4': '4th', 'last': 'last' };
+      // Which tabs exist, and which role may see each one. Every role gated into the page at
+      // all (manager/admin) can see every tab today, but a tab could be narrowed to ['admin']
+      // here without touching anything else — layout.(showTab) hides a tab button that the
+      // signed-in role isn't in this list for.
+      var TAB_ACCESS = { services: ['manager', 'admin'], staff: ['manager', 'admin'], reports: ['manager', 'admin'], settings: ['admin'], health: ['admin'] };
+
+      function $(id) { return document.getElementById(id); }
+      // Whether the "require a password change" box starts ticked, as set in Settings.
+      function defaultMustChange() {
+        return !!window.appSettings.new_account_change_password;
+      }
+
+      // The minimum password length set in Settings (8 until the settings have loaded).
+      function minPassword() {
+        return window.appSettings.min_password_length;
+      }
+
+      function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      }
+
+      async function api(path, opts) {
+        opts = opts || {};
+        var res = await fetch(BASE + path.replace(/^\//, ''), {
+          method: opts.method || 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: opts.body,
+          credentials: 'same-origin'
+        });
+        // Session ended (or never started): sign in again, then come back here.
+        if (res.status === 401) { window.location.href = BASE + 'index.html?next=manage.html'; throw new Error('Sign in required'); }
+        var data = await res.json().catch(function () { return {}; });
+        // A forced password change stops every action until it's done.
+        if (data.code === 'PASSWORD_CHANGE_REQUIRED') { window.location.href = BASE + 'account.html'; throw new Error(data.error); }
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      }
+
+      function renderDenied(message) {
+        $('tabs').classList.add('hidden');
+        var app = $('app');
+        app.textContent = '';
+        var panel = el('div', 'panel notice');
+        panel.appendChild(el('h2', null, message));
+        var p = el('p', 'muted');
+        var link = el('a', null, 'Go to sign in');
+        link.href = 'index.html?next=manage.html';
+        p.appendChild(link);
+        panel.appendChild(p);
+        app.appendChild(panel);
+      }
+
+      // ================= Services tab =================
+
+      // "HH:MM:SS" -> "12:00 PM"
+      function formatTime(t) {
+        var parts = String(t).split(':').map(Number);
+        var h = parts[0], m = parts[1];
+        var period = h < 12 ? 'AM' : 'PM';
+        var h12 = (h % 12) || 12;
+        return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + period;
+      }
+
+      function formatNthWeeks(nthWeeks) {
+        var weeks = String(nthWeeks || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        if (!weeks.length) return '';
+        return weeks.map(function (w) { return NTH_LABELS[w] || w; }).join(' and ');
+      }
+
+      function scheduleWhen(s) {
+        var day = WEEKDAYS[s.weekday] || '?';
+        var when = s.recurrence === 'monthly_nth'
+          ? 'The ' + formatNthWeeks(s.nthWeeks) + ' ' + day + ' of every month'
+          : 'Every ' + day;
+        return when + ', ' + formatTime(s.startTime) + '–' + formatTime(s.endTime);
+      }
+
+      function labelled(text, control) {
+        var l = el('label');
+        l.appendChild(el('span', null, text));
+        l.appendChild(control);
+        return l;
+      }
+
+      // ---- Manual override: close / reopen / clear ----
+      function doOverride(code, override, message, expiresAt) {
+        var body = { override: override };
+        if (message !== undefined) body.message = message;
+        if (expiresAt) body.expiresAt = expiresAt;
+        return api('/api/services/' + code + '/override', { method: 'PATCH', body: JSON.stringify(body) });
+      }
+
+      function openCloseForm(container, svc) {
+        container.textContent = '';
+        var form = el('form', 'inline-form');
+        var message = document.createElement('input');
+        message.type = 'text';
+        message.maxLength = 200;
+        message.required = true;
+        message.value = svc.manualMessage || svc.currentMessage || '';
+        message.placeholder = 'e.g. Closed for a Special Magistrate Hearing';
+        form.appendChild(labelled('Reason customers will see', message));
+
+        var until = document.createElement('input');
+        until.type = 'datetime-local';
+        form.appendChild(labelled('Reopens automatically at (optional)', until));
+
+        var err = el('p', 'err');
+        var actions = el('div', 'actions');
+        var cancel = el('button', 'secondary', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', function () { container.textContent = ''; });
+        var confirmBtn = el('button', 'primary', 'Close this service');
+        confirmBtn.type = 'submit';
+        actions.appendChild(cancel);
+        actions.appendChild(confirmBtn);
+        form.appendChild(err);
+        form.appendChild(actions);
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          err.textContent = '';
+          if (!message.value.trim()) { err.textContent = 'Enter a reason.'; return; }
+          confirmBtn.disabled = true;
+          doOverride(svc.code, 'closed', message.value.trim(), until.value ? new Date(until.value).toISOString() : null)
+            .then(loadServices)
+            .catch(function (error) { err.textContent = error.message; confirmBtn.disabled = false; });
+        });
+
+        container.appendChild(form);
+      }
+
+      // ---- Recurring closures ----
+      // A dropdown in 15-minute steps instead of the native time input, which is fiddly to use
+      // with a mouse or touch (small spinner targets, inconsistent across browsers).
+      // Lobby hours only: 7:00 AM to 6:00 PM. A saved closure outside that range still gets its own
+      // option, so it can be edited without its time silently changing.
+      function buildTimeSelect(initial) {
+        var sel = document.createElement('select');
+        var value = initial ? String(initial).slice(0, 5) : '12:00';
+        var times = [];
+        for (var mins = 7 * 60; mins <= 18 * 60; mins += 15) times.push(mins);
+        function addOption(mins) {
+          var h = Math.floor(mins / 60), m = mins % 60;
+          var h12 = (h % 12) || 12;
+          var o = el('option', null, h12 + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'));
+          o.value = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+          sel.appendChild(o);
+        }
+        var initialMins = Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+        if (times.indexOf(initialMins) < 0) times.push(initialMins);
+        times.sort(function (a, b) { return a - b; }).forEach(addOption);
+        sel.value = value;
+        return sel;
+      }
+
+      // Shared by "+ Add recurring closure" and "Edit": pass an existing schedule to prefill
+      // the form and save with PATCH instead of POST.
+      function openScheduleForm(container, svc, existing) {
+        container.textContent = '';
+        var form = el('form', 'inline-form');
+
+        var message = document.createElement('input');
+        message.type = 'text';
+        message.maxLength = 200;
+        message.required = true;
+        message.placeholder = 'e.g. Closed for a Special Magistrate Hearing';
+        if (existing) message.value = existing.message;
+        form.appendChild(labelled('Reason customers will see', message));
+
+        var recurrence = document.createElement('select');
+        ['weekly', 'monthly_nth'].forEach(function (v) {
+          var o = el('option', null, v === 'weekly' ? 'Every week' : 'Specific week(s) of the month');
+          o.value = v;
+          recurrence.appendChild(o);
+        });
+        recurrence.value = existing ? existing.recurrence : 'weekly';
+        form.appendChild(labelled('Repeats', recurrence));
+
+        var weekday = document.createElement('select');
+        WEEKDAYS.forEach(function (name, i) {
+          var o = el('option', null, name);
+          o.value = String(i);
+          weekday.appendChild(o);
+        });
+        weekday.value = existing ? String(existing.weekday) : '3'; // Wednesday, a reasonable default
+        form.appendChild(labelled('Day of the week', weekday));
+
+        var checksWrap = el('div');
+        var checksLabel = el('div', null, 'Which week(s) of the month');
+        checksLabel.style.fontSize = '13px';
+        checksLabel.style.color = 'var(--muted)';
+        var checks = el('div', 'checks');
+        var checkboxes = {};
+        var existingWeeks = existing ? String(existing.nthWeeks || '').split(',').map(function (s) { return s.trim(); }) : [];
+        ['1', '2', '3', '4', 'last'].forEach(function (v) {
+          var lbl = document.createElement('label');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = v;
+          cb.checked = existingWeeks.indexOf(v) >= 0;
+          checkboxes[v] = cb;
+          lbl.appendChild(cb);
+          lbl.appendChild(document.createTextNode(NTH_LABELS[v]));
+          checks.appendChild(lbl);
+        });
+        checksWrap.appendChild(checksLabel);
+        checksWrap.appendChild(checks);
+        form.appendChild(checksWrap);
+
+        function syncMonthly() { checksWrap.classList.toggle('hidden', recurrence.value !== 'monthly_nth'); }
+        recurrence.addEventListener('change', syncMonthly);
+        syncMonthly();
+
+        var row2 = el('div', 'row2');
+        var startTime = buildTimeSelect(existing ? existing.startTime : '12:00:00');
+        var endTime = buildTimeSelect(existing ? existing.endTime : '16:00:00');
+        row2.appendChild(labelled('Start time', startTime));
+        row2.appendChild(labelled('End time', endTime));
+        form.appendChild(row2);
+
+        var err = el('p', 'err');
+        var actions = el('div', 'actions');
+        var cancel = el('button', 'secondary', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', function () { container.textContent = ''; });
+        var save = el('button', 'primary', existing ? 'Save changes' : 'Add closure');
+        save.type = 'submit';
+        actions.appendChild(cancel);
+        actions.appendChild(save);
+        form.appendChild(err);
+        form.appendChild(actions);
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          err.textContent = '';
+          var nthWeeks = Object.keys(checkboxes).filter(function (v) { return checkboxes[v].checked; }).join(',');
+          if (!message.value.trim()) { err.textContent = 'Enter a reason.'; return; }
+          if (recurrence.value === 'monthly_nth' && !nthWeeks) { err.textContent = 'Choose at least one week of the month.'; return; }
+          if (startTime.value >= endTime.value) { err.textContent = 'End time must be after start time.'; return; }
+          save.disabled = true;
+          var body = JSON.stringify({
+            message: message.value.trim(),
+            recurrence: recurrence.value,
+            weekday: Number(weekday.value),
+            nthWeeks: nthWeeks,
+            startTime: startTime.value,
+            endTime: endTime.value
+          });
+          var request = existing
+            ? api('/api/services/schedules/' + existing.id, { method: 'PATCH', body: body })
+            : api('/api/services/' + svc.code + '/schedules', { method: 'POST', body: body });
+          request.then(loadServices).catch(function (error) { err.textContent = error.message; save.disabled = false; });
+        });
+
+        container.appendChild(form);
+      }
+
+      function toggleSchedule(id, active) {
+        api('/api/services/schedules/' + id, { method: 'PATCH', body: JSON.stringify({ active: active }) })
+          .then(loadServices).catch(function (err) { alert(err.message); });
+      }
+
+      function deleteScheduleRow(id) {
+        if (!confirm('Delete this recurring closure?')) return;
+        api('/api/services/schedules/' + id, { method: 'DELETE' })
+          .then(loadServices).catch(function (err) { alert(err.message); });
+      }
+
+      function renderServicePanel(svc) {
+        var panel = el('div', 'panel svc-card ' + (svc.available ? 'is-open' : 'is-closed'));
+
+        // Name on the left with its route beneath it in muted text; the status badge on the right.
+        var head = el('div', 'svc-head');
+        var titles = el('div', 'svc-title');
+        titles.appendChild(el('h2', null, svc.name));
+        if (svc.route) titles.appendChild(el('div', 'svc-route', svc.route));
+        head.appendChild(titles);
+        head.appendChild(el('span', 'status-pill ' + (svc.available ? 'status-open' : 'status-closed'), svc.available ? 'Open' : 'Closed'));
+        panel.appendChild(head);
+
+        if (!svc.available) {
+          var sourceLabel = svc.source === 'manual' ? ' (closed manually)' : svc.source === 'schedule' ? ' (recurring closure)' : '';
+          panel.appendChild(el('div', 'closed-banner', svc.currentMessage + sourceLabel));
+        }
+
+        var formContainer = el('div');
+
+        // Each choice is a button with a plain-language line beside it, so it's clear what it does.
+        var options = el('div', 'override-options');
+        function addOption(button, text) {
+          var row = el('div', 'override-option');
+          row.appendChild(button);
+          row.appendChild(el('p', 'override-desc', text));
+          options.appendChild(row);
+        }
+        function overrideButton(label, variant, onClick) {
+          var b = el('button', variant, label);
+          b.type = 'button';
+          b.addEventListener('click', onClick);
+          return b;
+        }
+        function runOverride(override) {
+          return function () { doOverride(svc.code, override).then(loadServices).catch(function (err) { alert(err.message); }); };
+        }
+
+        var closedBySchedule = !svc.available && svc.source === 'schedule';
+        var closedManually = !svc.available && svc.source === 'manual';
+
+        if (svc.available) {
+          addOption(overrideButton('Close now…', 'secondary', function () { openCloseForm(formContainer, svc); }),
+            'Keeps it closed until you reopen it. You can set a time for it to reopen automatically.');
+        } else if (closedBySchedule) {
+          addOption(overrideButton('Keep closed…', 'secondary', function () { openCloseForm(formContainer, svc); }),
+            'Stays closed after the scheduled closure ends, until you reopen it.');
+          addOption(overrideButton('Open now', 'primary', runOverride('open')),
+            'Opens it now, but only until the scheduled closure ends. Then it closes as scheduled.');
+        } else {
+          addOption(overrideButton('Reopen', 'primary', runOverride('open')),
+            'Lifts the manual closure. Recurring closures apply again.');
+        }
+
+        // Only worth offering when an override is in place and isn't already the manual closure above.
+        if (svc.manualOverride !== 'none' && !closedManually) {
+          addOption(overrideButton('Return to schedule', 'secondary', runOverride('none')),
+            'Drops any manual open or close, so recurring closures apply again.');
+        }
+        panel.appendChild(options);
+        panel.appendChild(formContainer);
+
+        panel.appendChild(el('div', 'schedules-head', 'Recurring closures (' + svc.schedules.length + ')'));
+        if (!svc.schedules.length) {
+          panel.appendChild(el('div', 'empty', 'No recurring closures.'));
+        } else {
+          svc.schedules.forEach(function (s, idx) {
+            var isLast = idx === svc.schedules.length - 1;
+            var row = el('div', 'schedule-row' + (s.active ? '' : ' paused') + (isLast ? ' last-row' : ''));
+            var left = el('div');
+            left.appendChild(el('div', 'schedule-when', scheduleWhen(s)));
+            left.appendChild(el('div', 'schedule-message', s.message + (s.active ? '' : ' — paused')));
+            row.appendChild(left);
+
+            var editContainer = el('div');
+
+            var actions = el('div', 'schedule-actions');
+            var edit = el('button', 'secondary', 'Edit');
+            edit.type = 'button';
+            edit.addEventListener('click', function () { openScheduleForm(editContainer, svc, s); });
+            var toggle = el('button', 'secondary', s.active ? 'Pause' : 'Resume');
+            toggle.type = 'button';
+            toggle.addEventListener('click', function () { toggleSchedule(s.id, !s.active); });
+            var del = el('button', 'danger', 'Delete');
+            del.type = 'button';
+            del.addEventListener('click', function () { deleteScheduleRow(s.id); });
+            actions.appendChild(edit);
+            actions.appendChild(toggle);
+            actions.appendChild(del);
+            row.appendChild(actions);
+
+            panel.appendChild(row);
+            panel.appendChild(editContainer);
+          });
+        }
+
+        var addScheduleContainer = el('div');
+        var addBtn = el('button', 'secondary add-schedule', '+ Add recurring closure');
+        addBtn.type = 'button';
+        addBtn.addEventListener('click', function () { openScheduleForm(addScheduleContainer, svc, null); });
+        panel.appendChild(addBtn);
+        panel.appendChild(addScheduleContainer);
+
+        return panel;
+      }
+
+      function renderServicesTab() {
+        var panel = $('panel-services');
+        panel.textContent = '';
+        // Alphabetical by name. Sorts a copy so state.services keeps the server's order.
+        state.services.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
+          .forEach(function (svc) { panel.appendChild(renderServicePanel(svc)); });
+      }
+
+      async function loadServices() {
+        state.services = await api('/api/services/admin');
+        renderServicesTab();
+      }
+
+      // ================= Staff tab =================
+
+      function roleOptions(selected, forNew) {
+        var sel = document.createElement('select');
+        var choices = state.user.role === 'admin' ? ['staff', 'manager', 'admin'] : ['staff'];
+        choices.forEach(function (r) {
+          var o = el('option', null, ROLE_LABEL[r]);
+          o.value = r;
+          if (r === selected) o.selected = true;
+          sel.appendChild(o);
+        });
+        if (forNew && state.user.role === 'manager') sel.disabled = true; // managers only ever create Staff
+        return sel;
+      }
+
+      // One account per row. Name, User ID, role and password reset live in the Edit account window;
+      // the row keeps only the quick actions.
+      function userRow(u) {
+        var tr = document.createElement('tr');
+        if (!u.active) tr.className = 'inactive';
+        tr.appendChild(el('td', null, u.displayName + (u.id === state.user.id ? ' (you)' : '')));
+        tr.appendChild(el('td', null, u.username));
+
+        var roleTd = el('td');
+        roleTd.appendChild(el('span', 'role-pill role-' + u.role, ROLE_LABEL[u.role]));
+        tr.appendChild(roleTd);
+
+        tr.appendChild(el('td', null, u.active ? 'Active' : 'Disabled'));
+        tr.appendChild(el('td', null, u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Never'));
+
+        var cell = el('td');
+        var actions = el('div', 'row-actions');
+        cell.appendChild(actions);
+        var canManage = state.user.role === 'admin' || (state.user.role === 'manager' && u.role === 'staff');
+        var isSelf = u.id === state.user.id;
+
+        if (isSelf || canManage) {
+          var edit = el('button', 'secondary', 'Edit');
+          edit.type = 'button';
+          edit.addEventListener('click', function () { openAccountDialog(u); });
+          actions.appendChild(edit);
+        }
+
+        if (canManage && !isSelf) {
+          var toggle = el('button', 'secondary', u.active ? 'Disable' : 'Enable');
+          toggle.type = 'button';
+          toggle.addEventListener('click', function () { patchUser(u.id, { active: !u.active }); });
+          actions.appendChild(toggle);
+
+          var remove = el('button', 'danger', 'Remove');
+          remove.type = 'button';
+          remove.addEventListener('click', function () { removeUser(u); });
+          actions.appendChild(remove);
+        }
+
+        tr.appendChild(cell);
+        return tr;
+      }
+
+      // The Edit account window: name, User ID and role, plus a password reset for other accounts.
+      // Changes only go to the server when Save or Reset is pressed.
+      function openAccountDialog(u) {
+        var isSelf = u.id === state.user.id;
+        var canChangeRole = state.user.role === 'admin' && !isSelf;
+
+        var overlay = el('div', 'modal-backdrop');
+        var dialog = el('div', 'modal');
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        function close() { overlay.remove(); }
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        document.addEventListener('keydown', function onKey(e) {
+          if (e.key === 'Escape' && document.body.contains(overlay)) { close(); document.removeEventListener('keydown', onKey); }
+        });
+
+        dialog.appendChild(el('h3', null, 'Edit account'));
+
+        var name = document.createElement('input');
+        name.value = u.displayName;
+        name.maxLength = 100;
+        dialog.appendChild(labelled('Display name', name));
+
+        var userId = document.createElement('input');
+        userId.value = u.username;
+        userId.maxLength = 40;
+        dialog.appendChild(labelled('User ID (the name used to sign in)', userId));
+
+        var role = roleOptions(u.role, false);
+        role.disabled = !canChangeRole;
+        dialog.appendChild(labelled(isSelf ? 'Role (you cannot change your own)' : 'Role', role));
+
+        var saveErr = el('p', 'err');
+        var saveBtn = el('button', 'primary', 'Save changes');
+        saveBtn.type = 'button';
+        saveBtn.addEventListener('click', function () {
+          var patch = {};
+          if (name.value.trim() !== u.displayName) patch.displayName = name.value.trim();
+          if (userId.value.trim() !== u.username) patch.username = userId.value.trim();
+          if (canChangeRole && role.value !== u.role) patch.role = role.value;
+          if (!Object.keys(patch).length) { close(); return; }
+          saveBtn.disabled = true;
+          api('/api/users/' + u.id, { method: 'PATCH', body: JSON.stringify(patch) })
+            .then(function () { close(); return loadUsers(); })
+            .catch(function (err) { saveErr.textContent = err.message; saveBtn.disabled = false; });
+        });
+        dialog.appendChild(saveErr);
+
+        // Password reset: not for your own account, which is changed on My account.
+        if (!isSelf) {
+          var resetHead = el('h4', null, 'Reset password');
+          dialog.appendChild(resetHead);
+          var newPw = document.createElement('input');
+          newPw.type = 'password';
+          newPw.placeholder = 'At least ' + minPassword() + ' characters';
+          newPw.autocomplete = 'new-password';
+          // The password field and its button share one row; the tick box and message sit below.
+          var resetRow = el('div', 'reset-row');
+          newPw.placeholder = 'New password (at least ' + minPassword() + ' characters)';
+          resetRow.appendChild(newPw);
+          dialog.appendChild(resetRow);
+          var mustChange = document.createElement('input');
+          mustChange.type = 'checkbox';
+          mustChange.checked = defaultMustChange();
+          var mustChangeLabel = el('label', 'check-row');
+          mustChangeLabel.appendChild(mustChange);
+          mustChangeLabel.appendChild(document.createTextNode(' Require user to change password on next sign-on'));
+          dialog.appendChild(mustChangeLabel);
+          var resetErr = el('p', 'err');
+          var resetBtn = el('button', 'secondary', 'Reset password');
+          resetBtn.type = 'button';
+          resetBtn.addEventListener('click', function () {
+            resetErr.textContent = '';
+            if (newPw.value.length < minPassword()) { resetErr.textContent = 'The new password must be at least ' + minPassword() + ' characters.'; return; }
+            resetBtn.disabled = true;
+            api('/api/users/' + u.id, {
+              method: 'PATCH',
+              body: JSON.stringify({ password: newPw.value, requirePasswordChange: mustChange.checked })
+            }).then(function () {
+              newPw.value = '';
+              resetErr.textContent = 'Password reset.';
+              resetErr.className = 'health-ok';
+              return loadUsers();
+            }).catch(function (err) {
+              resetErr.textContent = err.message;
+            }).finally(function () { resetBtn.disabled = false; });
+          });
+          resetRow.appendChild(resetBtn);
+          dialog.appendChild(resetErr);
+        }
+
+        var actions = el('div', 'modal-actions');
+        var closeBtn = el('button', 'secondary', 'Close');
+        closeBtn.type = 'button';
+        closeBtn.addEventListener('click', close);
+        actions.appendChild(closeBtn);
+        actions.appendChild(saveBtn);
+        dialog.appendChild(actions);
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        name.focus();
+      }
+
+      function removeUser(u) {
+        if (!confirm('Remove ' + u.displayName + ' (' + u.username + ')? This cannot be undone. To stop someone signing in but keep their account, use Disable instead.')) return;
+        api('/api/users/' + u.id, { method: 'DELETE' })
+          .then(loadUsers)
+          .catch(function (err) { alert(err.message); });
+      }
+
+      function patchUser(id, patch) {
+        api('/api/users/' + id, { method: 'PATCH', body: JSON.stringify(patch) })
+          .then(loadUsers)
+          .catch(function (err) { alert(err.message); });
+      }
+
+      function renderStaffTab() {
+        var panel = $('panel-staff');
+        panel.textContent = '';
+
+        var createPanel = el('div', 'panel');
+        var scopeNote = state.user.role === 'manager' ? ' (Staff accounts only)' : '';
+        createPanel.appendChild(el('h2', null, 'Add an account' + scopeNote));
+        var form = el('form', 'inline');
+        var username = document.createElement('input');
+        username.placeholder = 'e.g. jsmith';
+        username.setAttribute('aria-label', 'User ID');
+        username.required = true;
+        var displayName = document.createElement('input');
+        displayName.placeholder = 'e.g. Jane Smith';
+        displayName.required = true;
+        var password = document.createElement('input');
+        password.type = 'password';
+        password.placeholder = 'At least ' + minPassword() + ' characters';
+        password.required = true;
+        var role = roleOptions('staff', true);
+        var addBtn = el('button', 'primary', 'Add account');
+        addBtn.type = 'submit';
+
+        [
+          ['User ID', username], ['Display name', displayName], ['Password', password], ['Role', role]
+        ].forEach(function (pair) {
+          var label = el('label');
+          label.appendChild(el('span', null, pair[0]));
+          label.appendChild(pair[1]);
+          form.appendChild(label);
+        });
+        var mustChange = document.createElement('input');
+        mustChange.type = 'checkbox';
+        mustChange.checked = defaultMustChange();
+        var mustChangeLabel = el('label', 'check-row');
+        mustChangeLabel.appendChild(mustChange);
+        mustChangeLabel.appendChild(document.createTextNode(' Require user to change password on next sign-on'));
+        form.appendChild(mustChangeLabel);
+        form.appendChild(addBtn);
+        var err = el('p', 'msg');
+        createPanel.appendChild(form);
+        createPanel.appendChild(err);
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          err.textContent = '';
+          addBtn.disabled = true;
+          api('/api/users', {
+            method: 'POST',
+            body: JSON.stringify({
+              username: username.value.trim(),
+              displayName: displayName.value.trim(),
+              password: password.value,
+              role: role.value,
+              mustChangePassword: mustChange.checked
+            })
+          }).then(function () {
+            form.reset();
+            mustChange.checked = defaultMustChange();
+            loadUsers();
+          }).catch(function (error) {
+            err.textContent = error.message;
+          }).finally(function () { addBtn.disabled = false; });
+        });
+
+        panel.appendChild(createPanel);
+
+        var listPanel = el('div', 'panel');
+        // Managers only see Staff accounts, so the heading says so.
+        listPanel.appendChild(el('h2', null, state.user.role === 'manager' ? 'Staff accounts' : 'Accounts'));
+        var table = document.createElement('table');
+        table.className = 'staff-table';
+        var thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Name</th><th>User ID</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr>';
+        table.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        if (!state.users.length) {
+          var none = el('tr');
+          var noneCell = el('td', 'empty', state.user.role === 'manager'
+            ? 'No Staff accounts yet. Use "Add an account" above to create one.'
+            : 'No accounts yet.');
+          noneCell.colSpan = 6;
+          none.appendChild(noneCell);
+          tbody.appendChild(none);
+        }
+        state.users.forEach(function (u) { tbody.appendChild(userRow(u)); });
+        table.appendChild(tbody);
+        listPanel.appendChild(table);
+        panel.appendChild(listPanel);
+      }
+
+      async function loadUsers() {
+        state.users = await api('/api/users');
+        renderStaffTab();
+      }
+
+      // ================= Reports =================
+      // The dialog loads one day's tickets from the server, then works out every number on
+      // screen from those rows here, so switching between views never needs another request.
+      var REPORT_VIEWS = [
+        { key: 'history', label: 'Ticket history' },
+        { key: 'services', label: 'Service summary' },
+        { key: 'staff', label: 'Staff performance' },
+        { key: 'hourly', label: 'Hourly trends' }
+      ];
+      var STATUS_LABEL = { waiting: 'Waiting', called: 'Called', serving: 'Serving', served: 'Served', removed: 'Removed' };
+      var report = { from: '', to: '', view: 'history', search: '', tickets: [], loading: false, error: '', seq: 0 };
+      var reportRoot = null;
+      var reportInputs = {};
+
+      function pad2(n) { return (n < 10 ? '0' : '') + n; }
+      function todayIso() {
+        var d = new Date();
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      }
+
+      function minutesBetween(from, to) {
+        if (!from || !to) return null;
+        return (new Date(to) - new Date(from)) / 60000;
+      }
+      function average(values) {
+        var v = values.filter(function (x) { return x !== null; });
+        if (!v.length) return null;
+        return v.reduce(function (sum, x) { return sum + x; }, 0) / v.length;
+      }
+      function fmtMinutes(m) { return m === null ? '—' : m < 1 ? '< 1 min' : Math.round(m) + ' min'; }
+      function fmtClock(iso) { return iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—'; }
+      function serviceName(code) {
+        var s = state.services.find(function (c) { return c.code === code; });
+        return s ? s.name : code;
+      }
+
+      // A plain table from a header list and rows of cell values. Cells are set as text, never HTML.
+      function reportTable(headers, rows, footer) {
+        var table = document.createElement('table');
+        var thead = document.createElement('thead');
+        var headRow = document.createElement('tr');
+        headers.forEach(function (h) { headRow.appendChild(el('th', h.num ? 'r' : null, h.label)); });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        rows.forEach(function (row) {
+          // A row is either a list of cells, or { cells, className } for a styled row.
+          var cells = Array.isArray(row) ? row : row.cells;
+          var tr = document.createElement('tr');
+          if (!Array.isArray(row) && row.className) tr.className = row.className;
+          cells.forEach(function (cell, i) {
+            var td = document.createElement('td');
+            if (headers[i].num) td.className = 'r';
+            if (cell instanceof Node) td.appendChild(cell); else td.textContent = cell;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        if (footer) {
+          var tfoot = document.createElement('tfoot');
+          var fr = document.createElement('tr');
+          footer.forEach(function (cell, i) {
+            var td = document.createElement('td');
+            if (headers[i].num) td.className = 'r';
+            td.textContent = cell;
+            fr.appendChild(td);
+          });
+          tfoot.appendChild(fr);
+          table.appendChild(tfoot);
+        }
+        return table;
+      }
+
+      // The tickets Ticket history shows: all of them, or only those whose customer name contains the
+      // search text (ignoring case). Export uses the same list, so the file matches the screen.
+      function filteredHistory(tickets) {
+        var q = report.search.trim().toLowerCase();
+        return q ? tickets.filter(function (t) { return t.customerName.toLowerCase().indexOf(q) >= 0; }) : tickets;
+      }
+
+      function historyView(tickets) {
+        var q = report.search.trim();
+        var shown = filteredHistory(tickets);
+        if (!shown.length) return el('p', 'empty', q ? 'No tickets match "' + q + '".' : 'No tickets in this range.');
+        var rows = shown.map(function (t) {
+          return [
+            t.ticketNumber,
+            t.customerName,
+            serviceName(t.serviceCode),
+            fmtClock(t.createdAt),
+            t.calledAt ? fmtClock(t.calledAt) : '—',
+            t.completedAt && (t.status === 'served' || t.status === 'removed') ? fmtClock(t.completedAt) : '—',
+            t.calledBy || '—',
+            t.counter || '—',
+            STATUS_LABEL[t.status] || t.status
+          ];
+        });
+        var headers = [
+          { label: 'Ticket' }, { label: 'Name' }, { label: 'Service' }, { label: 'Arrived' },
+          { label: 'Called' }, { label: 'Completed' }, { label: 'Staff' }, { label: 'Counter' }, { label: 'Status' }
+        ];
+        return reportTable(headers, rows);
+      }
+
+      function serviceView(tickets) {
+        var byCode = {};
+        tickets.forEach(function (t) {
+          var r = byCode[t.serviceCode] || (byCode[t.serviceCode] = { arrived: 0, served: 0, removed: 0, open: 0, waits: [], times: [] });
+          r.arrived++;
+          if (t.status === 'served') r.served++;
+          else if (t.status === 'removed') r.removed++;
+          else r.open++;
+          // A ticket returned to the lobby keeps its old calledAt, so only count waits for tickets
+          // that are actually out of the lobby.
+          if (t.status !== 'waiting') r.waits.push(minutesBetween(t.createdAt, t.calledAt));
+          if (t.status === 'served') r.times.push(minutesBetween(t.calledAt, t.completedAt));
+        });
+        var codes = Object.keys(byCode).sort(function (a, b) { return serviceName(a).localeCompare(serviceName(b)); });
+        var total = { arrived: 0, served: 0, removed: 0, open: 0, waits: [], times: [] };
+        var rows = codes.map(function (code) {
+          var r = byCode[code];
+          total.arrived += r.arrived; total.served += r.served; total.removed += r.removed; total.open += r.open;
+          total.waits = total.waits.concat(r.waits); total.times = total.times.concat(r.times);
+          return [serviceName(code), String(r.arrived), String(r.served), String(r.removed), String(r.open),
+            fmtMinutes(average(r.waits)), fmtMinutes(average(r.times))];
+        });
+        var headers = [
+          { label: 'Service' }, { label: 'Arrived', num: true }, { label: 'Served', num: true },
+          { label: 'Removed', num: true }, { label: 'Still open', num: true },
+          { label: 'Avg wait', num: true }, { label: 'Avg service time', num: true }
+        ];
+        var footer = ['Total', String(total.arrived), String(total.served), String(total.removed), String(total.open),
+          fmtMinutes(average(total.waits)), fmtMinutes(average(total.times))];
+        return reportTable(headers, rows, footer);
+      }
+
+      function staffView(tickets) {
+        // Each person's totals across every service they called people for, with the per-service
+        // breakdown listed under their name. The last row totals everyone.
+        var people = {};
+        var all = { called: 0, served: 0, times: [] };
+        tickets.forEach(function (t) {
+          if (!t.calledBy) return;
+          var p = people[t.calledBy] || (people[t.calledBy] = { called: 0, served: 0, times: [], services: {} });
+          var s = p.services[t.serviceCode] || (p.services[t.serviceCode] = { code: t.serviceCode, called: 0, served: 0, times: [] });
+          [p, s, all].forEach(function (r) {
+            r.called++;
+            if (t.status === 'served') {
+              r.served++;
+              r.times.push(minutesBetween(t.calledAt, t.completedAt));
+            }
+          });
+        });
+
+        var rows = [];
+        Object.keys(people).sort(function (a, b) { return a.localeCompare(b); }).forEach(function (name) {
+          var p = people[name];
+          rows.push({ cells: [name, String(p.called), String(p.served), fmtMinutes(average(p.times))], className: 'person-total' });
+          Object.keys(p.services)
+            .map(function (k) { return p.services[k]; })
+            .sort(function (a, b) { return serviceName(a.code).localeCompare(serviceName(b.code)); })
+            .forEach(function (s) {
+              rows.push({ cells: [serviceName(s.code), String(s.called), String(s.served), fmtMinutes(average(s.times))], className: 'service-row' });
+            });
+        });
+        var headers = [
+          { label: 'Staff' }, { label: 'Called', num: true }, { label: 'Completed', num: true }, { label: 'Avg service time', num: true }
+        ];
+        var footer = ['All staff', String(all.called), String(all.served), fmtMinutes(average(all.times))];
+        return reportTable(headers, rows, rows.length ? footer : null);
+      }
+
+      function hourlyView(tickets) {
+        // Buckets are by the hour of arrival (waits and arrivals) and of completion (served).
+        var buckets = {};
+        function bucket(h) { return buckets[h] || (buckets[h] = { arrivals: 0, served: 0, waits: [] }); }
+        tickets.forEach(function (t) {
+          var arrivedHour = new Date(t.createdAt).getHours();
+          bucket(arrivedHour).arrivals++;
+          if (t.status !== 'waiting') bucket(arrivedHour).waits.push(minutesBetween(t.createdAt, t.calledAt));
+          if (t.status === 'served') bucket(new Date(t.completedAt).getHours()).served++;
+        });
+        var hours = Object.keys(buckets).map(Number);
+        if (!hours.length) return el('p', 'empty', 'No tickets on this day.');
+        var first = Math.min.apply(null, hours), last = Math.max.apply(null, hours);
+        var peak = 0;
+        hours.forEach(function (h) { peak = Math.max(peak, buckets[h].arrivals, buckets[h].served); });
+
+        var rows = [];
+        for (var h = first; h <= last; h++) {
+          var b = buckets[h] || { arrivals: 0, served: 0, waits: [] };
+          var label = new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: 'numeric' });
+          rows.push([label, barCell(b.arrivals, 'arrivals', peak), barCell(b.served, 'served', peak), fmtMinutes(average(b.waits))]);
+        }
+        var headers = [
+          { label: 'Hour' }, { label: 'Arrivals' }, { label: 'Served' }, { label: 'Avg wait', num: true }
+        ];
+        return reportTable(headers, rows);
+      }
+
+      // CSV for the Ticket history list. Values that a spreadsheet would read as a formula get a
+      // leading apostrophe so a name can't run as one. The byte-order mark makes Excel read UTF-8.
+      function csvCell(value) {
+        var s = value === null || value === undefined ? '' : String(value);
+        if (/^[=+\-@]/.test(s)) s = "'" + s;
+        return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }
+
+      // A timestamp as two spreadsheet cells: the date as yyyy-mm-dd (sorts correctly) and the time
+      // as 24-hour hh:mm. Empty when there's no time.
+      function csvDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      }
+      function csvTime(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      }
+
+      // Saves CSV lines as a file. The byte-order mark makes Excel read the file as UTF-8.
+      function downloadCsv(lines, filename) {
+        var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      }
+
+      // Export on any report view: the history list (with its name search) or the table on screen.
+      function exportCurrentView() {
+        if (report.view === 'history') return exportHistoryCsv();
+        var table = reportRoot.querySelector('.report-body table');
+        if (!table) return;
+        var lines = [];
+        table.querySelectorAll('thead tr, tbody tr, tfoot tr').forEach(function (tr) {
+          lines.push(Array.prototype.map.call(tr.children, function (cell) { return csvCell(cell.textContent.trim()); }).join(','));
+        });
+        downloadCsv(lines, 'report-' + report.view + '_' + report.from + '_to_' + report.to + '.csv');
+      }
+
+      function exportHistoryCsv() {
+        var header = ['Ticket', 'Name', 'Service',
+          'Arrived date', 'Arrived time', 'Called date', 'Called time', 'Completed date', 'Completed time',
+          'Staff', 'Counter', 'Status'];
+        var lines = [header.join(',')];
+        filteredHistory(report.tickets).forEach(function (t) {
+          var finished = t.status === 'served' || t.status === 'removed';
+          lines.push([
+            t.ticketNumber, t.customerName, serviceName(t.serviceCode),
+            csvDate(t.createdAt), csvTime(t.createdAt),
+            csvDate(t.calledAt), csvTime(t.calledAt),
+            finished ? csvDate(t.completedAt) : '', finished ? csvTime(t.completedAt) : '',
+            t.calledBy, t.counter, STATUS_LABEL[t.status] || t.status
+          ].map(csvCell).join(','));
+        });
+        downloadCsv(lines, 'ticket-history_' + report.from + '_to_' + report.to + '.csv');
+      }
+
+      function barCell(count, kind, peak) {
+        var wrap = el('div', 'bar-line');
+        var track = el('div', 'bar-track');
+        var fill = el('div', 'bar-fill ' + kind);
+        fill.style.width = (peak ? (count / peak) * 100 : 0) + '%';
+        track.appendChild(fill);
+        wrap.appendChild(track);
+        wrap.appendChild(el('span', 'bar-num', String(count)));
+        return wrap;
+      }
+
+      function renderReportBody() {
+        if (!reportRoot) return;
+        var body = reportRoot.querySelector('.report-body');
+        var meta = reportRoot.querySelector('.report-summary');
+        body.textContent = '';
+        reportRoot.querySelectorAll('.report-view').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.view === report.view);
+        });
+        // The name search only applies to Ticket history, so only that view shows the box.
+        reportRoot.querySelector('.report-search').classList.toggle('hidden', report.view !== 'history');
+        // Export and print work on every view. Export needs something to export.
+        reportRoot.querySelector('.report-export').disabled = report.loading || !report.tickets.length;
+        reportRoot.querySelector('.print-title').textContent = 'Lobby Check-In report: ' + report.from + ' to ' + report.to;
+        if (report.loading) { meta.textContent = 'Loading…'; return; }
+        if (report.error) { meta.textContent = report.error; return; }
+        var n = report.tickets.length;
+        var when = report.from === report.to ? 'on ' + report.from : 'from ' + report.from + ' to ' + report.to;
+        meta.textContent = n + (n === 1 ? ' ticket' : ' tickets') + ' created ' + when;
+        if (!n) { body.appendChild(el('p', 'empty', 'No tickets were created in this range.')); return; }
+        var views = { history: historyView, services: serviceView, staff: staffView, hourly: hourlyView };
+        body.appendChild(views[report.view](report.tickets));
+      }
+
+      async function loadReportRange() {
+        var seq = ++report.seq;
+        report.loading = true;
+        report.error = '';
+        renderReportBody();
+        try {
+          var data = await api('/api/reports/range?from=' + encodeURIComponent(report.from) + '&to=' + encodeURIComponent(report.to));
+          if (seq !== report.seq) return;
+          report.tickets = data.tickets;
+        } catch (err) {
+          if (seq !== report.seq) return;
+          report.tickets = [];
+          report.error = err.message;
+        }
+        report.loading = false;
+        renderReportBody();
+      }
+
+      // A labelled date field for the From or To end of the range. Changing one keeps the range in
+      // order: moving From past To pulls To along, and moving To before From pulls From back.
+      function dateField(label, key) {
+        var wrap = el('label', 'report-field');
+        wrap.appendChild(el('span', null, label));
+        var input = document.createElement('input');
+        input.type = 'date';
+        input.max = todayIso();
+        input.value = report[key];
+        input.addEventListener('change', function () {
+          if (!input.value) return;
+          report[key] = input.value;
+          if (report.from > report.to) {
+            if (key === 'from') report.to = report.from; else report.from = report.to;
+            reportInputs.from.value = report.from;
+            reportInputs.to.value = report.to;
+          }
+          loadReportRange();
+        });
+        reportInputs[key] = input;
+        wrap.appendChild(input);
+        return wrap;
+      }
+
+      // Built once into the Report tab's panel. Showing the tab loads the selected range.
+      function buildReports(container) {
+        reportRoot = container;
+        if (!report.from) report.from = todayIso();
+        if (!report.to) report.to = todayIso();
+
+        var head = el('div', 'report-head');
+        // Filters on the left, actions on the right, so the page reads as two clear groups.
+        var filters = el('div', 'report-filters');
+        var actionsBox = el('div', 'report-actions');
+        filters.appendChild(dateField('From', 'from'));
+        filters.appendChild(dateField('To', 'to'));
+        var search = document.createElement('input');
+        search.type = 'search';
+        search.className = 'report-search';
+        search.placeholder = 'Search name';
+        search.setAttribute('aria-label', 'Search ticket history by name');
+        search.value = report.search;
+        search.addEventListener('input', function () {
+          report.search = search.value;
+          renderReportBody();
+        });
+        filters.appendChild(search);
+        var exportBtn = el('button', 'secondary report-export', 'Export CSV');
+        exportBtn.type = 'button';
+        exportBtn.title = 'Download what is shown on screen as a spreadsheet file';
+        exportBtn.addEventListener('click', exportCurrentView);
+        actionsBox.appendChild(exportBtn);
+        var printBtn = el('button', 'secondary report-print', 'Print');
+        printBtn.type = 'button';
+        printBtn.title = 'Print what is shown on screen';
+        printBtn.addEventListener('click', function () { window.print(); });
+        actionsBox.appendChild(printBtn);
+        head.appendChild(filters);
+        head.appendChild(actionsBox);
+        container.appendChild(head);
+        // Only shown when printing: the date range, since the screen shows it in the summary line.
+        container.appendChild(el('h2', 'print-title'));
+
+        var views = el('div', 'report-views');
+        REPORT_VIEWS.forEach(function (v) {
+          var b = el('button', 'report-view', v.label);
+          b.type = 'button';
+          b.dataset.view = v.key;
+          b.addEventListener('click', function () { report.view = v.key; renderReportBody(); });
+          views.appendChild(b);
+        });
+        container.appendChild(views);
+        container.appendChild(el('p', 'report-summary'));
+        container.appendChild(el('div', 'report-body panel'));
+      }
+
+      // Ends the session on the server, then returns to the home page. The page can't be used
+      // without a session, so it doesn't matter if the request fails: the cookie is cleared either way.
+      $('signout').addEventListener('click', function () {
+        fetch(BASE + 'api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+          .catch(function () {})
+          .then(function () { window.location.href = BASE + 'index.html'; });
+      });
+
+      // ================= Settings tab (admins only) =================
+      // Plain-language names for the action codes the server writes to the audit log.
+      var AUDIT_LABEL = {
+        'auth.login': 'Signed in',
+        'auth.login_failed': 'Failed sign-in',
+        'user.create': 'Account created',
+        'user.update': 'Account changed',
+        'user.password_reset': 'Password reset',
+        'user.delete': 'Account removed',
+        'account.update': 'Changed own profile',
+        'account.password_change': 'Changed own password',
+        'service.override': 'Service opened or closed',
+        'schedule.create': 'Recurring closure added',
+        'schedule.update': 'Recurring closure changed',
+        'schedule.delete': 'Recurring closure removed',
+        'settings.update': 'Settings changed',
+        'cleanup.run': 'Old-record cleanup',
+        'tickets.auto_close': 'End-of-day close',
+        'tests.run': 'Automated tests run'
+      };
+
+      var settingsUi = {};
+
+      function fmtStamp(iso) {
+        return iso ? new Date(iso).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—';
+      }
+
+      function fmtUptime(seconds) {
+        var d = Math.floor(seconds / 86400), h = Math.floor((seconds % 86400) / 3600), m = Math.floor((seconds % 3600) / 60);
+        return (d ? d + 'd ' : '') + (h ? h + 'h ' : '') + m + 'm';
+      }
+
+      // A titled group of panels. Groups stack down the page; the panels inside sit side by side when there is room.
+      function settingsGroup(title, panels) {
+        var group = el('section', 'settings-group');
+        group.appendChild(el('h3', 'settings-group-title', title));
+        var grid = el('div', 'settings-grid');
+        panels.forEach(function (p) { grid.appendChild(p); });
+        group.appendChild(grid);
+        return group;
+      }
+
+      // The Settings tab builds its own groups into `container`. Health checks and the audit log go
+      // into `healthContainer`, which is the Health & audit tab.
+      function buildSettings(container, healthContainer) {
+        // Health check
+        var healthPanel = el('div', 'panel');
+        healthPanel.appendChild(el('h2', null, 'System health'));
+        healthPanel.appendChild(el('p', 'muted', 'Checks the app and database are working, and that they agree on the time.'));
+        var healthBtn = el('button', 'primary', 'Run health check');
+        healthBtn.type = 'button';
+        healthBtn.addEventListener('click', runHealthCheck);
+        healthPanel.appendChild(healthBtn);
+        var dbBtn = el('button', 'secondary', 'Check database');
+        dbBtn.type = 'button';
+        dbBtn.style.marginLeft = '8px';
+        dbBtn.addEventListener('click', runDatabaseCheck);
+        healthPanel.appendChild(dbBtn);
+        settingsUi.dbOut = el('div');
+        settingsUi.dbOut.style.marginTop = '12px';
+        healthPanel.appendChild(settingsUi.dbOut);
+        settingsUi.healthOut = el('div');
+        settingsUi.healthOut.style.marginTop = '12px';
+        healthPanel.appendChild(settingsUi.healthOut);
+        var systemPanels = [healthPanel];
+
+        // Old records
+        var recordsPanel = el('div', 'panel');
+        recordsPanel.appendChild(el('p', 'muted', 'Tidies up finished tickets (served or removed) once they are older than the number of days below. Runs automatically each day. Waiting and in-progress tickets are never touched.'));
+        var form = el('form', 'inline');
+        form.addEventListener('submit', function (e) { e.preventDefault(); });
+        var days = document.createElement('input');
+        days.type = 'number';
+        days.min = '0';
+        days.max = '3650';
+        days.step = '1';
+        days.required = true;
+        var action = document.createElement('select');
+        [['anonymize', 'Blank out customer names (keep the ticket for reports)'], ['delete', 'Delete the ticket (reports lose it for good)']].forEach(function (pair) {
+          var o = el('option', null, pair[1]);
+          o.value = pair[0];
+          action.appendChild(o);
+        });
+        form.appendChild(labelled('Remove after (days, 0 = keep everything)', days));
+        form.appendChild(labelled('What to do', action));
+        recordsPanel.appendChild(form);
+        settingsUi.retention = { days: days, action: action };
+
+        settingsUi.retentionInfo = el('p', 'muted');
+        recordsPanel.appendChild(settingsUi.retentionInfo);
+        var runBtn = el('button', 'secondary', 'Run cleanup now');
+        runBtn.type = 'button';
+        runBtn.addEventListener('click', runCleanupNow);
+        recordsPanel.appendChild(runBtn);
+        var recordsPanels = [recordsPanel];
+
+        // Automated tests: runs the same checks as `npm test`, so no command line is needed.
+        var testsPanel = el('div', 'panel');
+        testsPanel.appendChild(el('h2', null, 'Automated tests'));
+        testsPanel.appendChild(el('p', 'muted', 'Checks the sign-in rules, the closure rules, the report date rules and the database setup file. Takes a few seconds.'));
+        var testsBtn = el('button', 'primary', 'Run tests');
+        testsBtn.type = 'button';
+        testsBtn.addEventListener('click', runTests);
+        testsPanel.appendChild(testsBtn);
+        settingsUi.testsSummary = el('p', 'muted');
+        settingsUi.testsSummary.style.margin = '12px 0 0';
+        testsPanel.appendChild(settingsUi.testsSummary);
+        settingsUi.testsOut = el('pre', 'test-output');
+        settingsUi.testsOut.classList.add('hidden');
+        testsPanel.appendChild(settingsUi.testsOut);
+        systemPanels.push(testsPanel);
+        settingsUi.testsBtn = testsBtn;
+
+        // Audit log
+        var auditPanel = el('div', 'panel');
+        var auditHead = el('div', 'panel-head');
+        auditHead.appendChild(el('h2', null, 'Audit log'));
+        var refresh = el('button', 'secondary', 'Refresh');
+        refresh.type = 'button';
+        refresh.addEventListener('click', loadAudit);
+        auditHead.appendChild(refresh);
+        auditPanel.appendChild(auditHead);
+        auditPanel.appendChild(el('p', 'muted', 'The latest 200 changes: who signed in, who changed accounts, closures, and settings. Search by a name or User ID to see what that person did, or what was done to their account.'));
+        var auditSearch = el('input', 'audit-search');
+        auditSearch.type = 'search';
+        auditSearch.placeholder = 'Search by name, User ID, or action';
+        auditSearch.setAttribute('aria-label', 'Search the audit log');
+        auditSearch.addEventListener('input', function () {
+          clearTimeout(settingsUi.auditTimer);
+          settingsUi.auditTimer = setTimeout(loadAudit, 300);
+        });
+        settingsUi.auditSearch = auditSearch;
+        auditPanel.appendChild(auditSearch);
+        settingsUi.auditOut = el('div');
+        auditPanel.appendChild(settingsUi.auditOut);
+        var activityPanels = [auditPanel];
+        healthContainer.appendChild(settingsGroup('Health and tests', systemPanels));
+        // Kiosk, monitor, security, branding and audit settings are built once their values load.
+        settingsUi.appContainer = el('div', 'settings-columns');
+        container.appendChild(settingsUi.appContainer);
+        container.appendChild(settingsGroup('Old records', recordsPanels));
+
+        // One Save button for every setting on this tab. Run cleanup now and the logo are separate actions.
+        var saveBar = el('div', 'save-bar');
+        var saveAll = el('button', 'primary', 'Save settings');
+        saveAll.type = 'button';
+        saveAll.addEventListener('click', saveAllSettings);
+        settingsUi.saveAll = saveAll;
+        settingsUi.saveMsg = el('p', 'msg');
+        saveBar.appendChild(saveAll);
+        saveBar.appendChild(settingsUi.saveMsg);
+        container.appendChild(saveBar);
+        healthContainer.appendChild(settingsGroup('Activity', activityPanels));
+      }
+
+      function loadSettingsTab() {
+        loadRetention();
+        loadAppSettings();
+      }
+
+      // ---- Kiosk, monitor, security, branding and audit log settings ----
+      // Each group saves its own fields. The server checks every value and returns a plain message if one is wrong.
+      var APP_GROUPS = [
+        { title: 'Kiosk', note: 'Kiosks pick up these changes within a minute, without a reload.', keys: ['kiosk_idle_seconds', 'kiosk_done_seconds', 'kiosk_theme', 'checkin_rate_per_minute'] },
+        { title: 'Lobby monitor', note: 'Monitors pick up these changes within a minute, without a reload. Pick at least one department for each side.', keys: ['monitor_call_seconds', 'monitor_chime', 'monitor_scroll', 'monitor_theme', 'monitor_left', 'monitor_right'] },
+        { title: 'Security and sessions', note: 'A new session length applies at each sign-in. The idle sign-out applies from each person\'s next request. Sign-in lockout counts failed attempts in the audit log.', keys: ['session_hours', 'session_idle_minutes', 'min_password_length', 'new_account_change_password', 'lockout_attempts', 'lockout_minutes'] },
+        { title: 'Branding', note: 'The organisation name appears above the page headings and in the page titles. The logo appears in the page headers. With no logo set, the headers show none.', keys: ['org_name'], logo: true },
+        { title: 'End of day', note: 'At this time each day, every ticket still waiting, called or being served is closed as removed, and the screens update. It runs once a day, using the server\'s clock, and the audit log records how many were closed. Leave blank to turn it off.', keys: ['auto_close_time'] },
+        { title: 'Audit log retention', note: 'Entries older than this are removed each day. Lockouts depend on recent failed sign-ins, so keep at least 30 days, or 0 to keep everything.', keys: ['audit_retention_days'] }
+      ];
+
+      function loadAppSettings() {
+        return api('/api/admin/app-settings').then(function (data) {
+          settingsUi.appData = data;
+          settingsUi.appInputs = {};
+          settingsUi.appContainer.textContent = '';
+          APP_GROUPS.forEach(function (g) {
+            settingsUi.appContainer.appendChild(settingsGroup(g.title, [buildAppPanel(g, data)]));
+          });
+        }).catch(function (err) {
+          settingsUi.appContainer.textContent = err.message;
+        });
+      }
+
+      function buildAppPanel(g, data) {
+        var panel = el('div', 'panel');
+        panel.appendChild(el('p', 'muted', g.note));
+        // No buttons here: the Save settings button at the foot of the tab saves every group.
+        var form = el('form', 'inline');
+        form.addEventListener('submit', function (e) { e.preventDefault(); });
+        // Department lists share one full-width row, side by side. Other fields flow in the grid above it.
+        var keyRow = el('div', 'key-row');
+        g.keys.forEach(function (key) {
+          var field = appField(key, data);
+          if (data.definitions[key].type === 'keys') keyRow.appendChild(field); else form.appendChild(field);
+        });
+        if (keyRow.childNodes.length) form.appendChild(keyRow);
+        panel.appendChild(form);
+        if (g.logo) panel.appendChild(logoBlock(data));
+        return panel;
+      }
+
+      // One field, and a reader that returns its value in the form the server expects.
+      function appField(key, data) {
+        var def = data.definitions[key];
+        var value = data.values[key];
+        var input, row;
+        if (def.type === 'bool') {
+          input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = !!value;
+          row = el('label', 'check-row');
+          row.appendChild(input);
+          row.appendChild(document.createTextNode(' ' + def.label));
+          settingsUi.appInputs[key] = function () { return input.checked; };
+          return row;
+        }
+        if (def.type === 'choice') {
+          input = document.createElement('select');
+          def.options.forEach(function (o) {
+            var opt = el('option', null, o);
+            opt.value = o;
+            input.appendChild(opt);
+          });
+          input.value = value;
+          settingsUi.appInputs[key] = function () { return input.value; };
+          return labelled(def.label, input);
+        }
+        if (def.type === 'keys') {
+          var options = data.departments.map(function (d) { return { value: d.id, label: d.label + ' (whole department)' }; })
+            .concat(data.services.map(function (s) { return { value: s.code, label: s.name }; }));
+          var picks = el('div', 'key-picks');
+          var boxes = options.map(function (o) {
+            var c = document.createElement('input');
+            c.type = 'checkbox';
+            c.value = o.value;
+            c.checked = value.indexOf(o.value) >= 0;
+            var l = el('label', 'check-row');
+            l.appendChild(c);
+            l.appendChild(document.createTextNode(' ' + o.label));
+            picks.appendChild(l);
+            return c;
+          });
+          settingsUi.appInputs[key] = function () {
+            return boxes.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+          };
+          var wrap = el('div', 'key-field');
+          wrap.appendChild(el('span', 'field-label', def.label));
+          wrap.appendChild(picks);
+          return wrap;
+        }
+        if (def.type === 'clock') {
+          input = document.createElement('input');
+          input.type = 'time';
+          input.value = value;
+          settingsUi.appInputs[key] = function () { return input.value; };
+          return labelled(def.label, input);
+        }
+        input = document.createElement('input');
+        if (def.type === 'int') {
+          input.type = 'number';
+          input.min = def.min;
+          input.max = def.max;
+          input.step = '1';
+          input.required = true;
+          input.value = value;
+          settingsUi.appInputs[key] = function () { return Number(input.value); };
+        } else {
+          input.type = 'text';
+          input.maxLength = def.max;
+          input.value = value;
+          settingsUi.appInputs[key] = function () { return input.value; };
+        }
+        return labelled(def.label, input);
+      }
+
+      // Saves every setting on the Settings tab in one go: the kiosk, monitor, security, branding and audit
+      // groups, then the old-records rule. A failure stops the save and shows the message beside the button.
+      function saveAllSettings() {
+        if (!settingsUi.appInputs) return;
+        var btn = settingsUi.saveAll;
+        var msg = settingsUi.saveMsg;
+        var r = settingsUi.retention;
+        var body = {};
+        APP_GROUPS.forEach(function (g) { g.keys.forEach(function (key) { body[key] = settingsUi.appInputs[key](); }); });
+        btn.disabled = true;
+        msg.className = 'msg';
+        msg.textContent = '';
+        api('/api/admin/app-settings', { method: 'PUT', body: JSON.stringify(body) }).then(function () {
+          return api('/api/admin/settings', { method: 'PUT', body: JSON.stringify({ retentionDays: Number(r.days.value), retentionAction: r.action.value }) });
+        }).then(function () {
+          msg.className = 'health-ok';
+          msg.textContent = 'Settings saved.';
+          loadRetention();
+          loadAudit();
+        }).catch(function (err) {
+          msg.textContent = err.message;
+        }).finally(function () { btn.disabled = false; });
+      }
+
+      // Logo: PNG, JPEG or WebP up to 300 KB. Stored in the database, so it follows the app to any host.
+      function logoBlock(data) {
+        var wrap = el('div', 'key-field');
+        wrap.appendChild(el('span', 'field-label', 'Logo'));
+        var row = el('div', 'logo-row');
+        if (data.logoUrl) {
+          var img = document.createElement('img');
+          img.className = 'logo-preview';
+          img.alt = 'Current logo';
+          img.src = BASE + data.logoUrl;
+          // A saved logo the browser can't draw: say so, and point to the way to fix it.
+          img.addEventListener('error', function () {
+            img.replaceWith(el('span', 'msg', 'The saved logo could not be displayed. Remove it, then upload it again.'));
+          });
+          row.appendChild(img);
+        } else {
+          row.appendChild(el('span', 'muted', 'No logo set. The headers show no logo.'));
+        }
+        var msg = el('p', 'msg');
+        var file = document.createElement('input');
+        file.type = 'file';
+        file.accept = 'image/png,image/jpeg,image/webp';
+        file.addEventListener('change', function () {
+          var picked = file.files && file.files[0];
+          if (!picked) return;
+          if (picked.size > 300 * 1024) { msg.textContent = 'Choose an image under 300 KB.'; file.value = ''; return; }
+          var reader = new FileReader();
+          reader.onload = function () {
+            api('/api/admin/logo', { method: 'PUT', body: JSON.stringify({ dataUrl: reader.result }) }).then(function () {
+              loadAppSettings();
+            }).catch(function (err) { msg.textContent = err.message; });
+          };
+          reader.readAsDataURL(picked);
+        });
+        var upload = el('div', 'logo-actions');
+        upload.appendChild(file);
+        if (data.logoUrl) {
+          var remove = el('button', 'secondary', 'Remove logo');
+          remove.type = 'button';
+          remove.addEventListener('click', function () {
+            api('/api/admin/logo', { method: 'DELETE' }).then(loadAppSettings).catch(function (err) { msg.textContent = err.message; });
+          });
+          upload.appendChild(remove);
+        }
+        wrap.appendChild(row);
+        wrap.appendChild(upload);
+        wrap.appendChild(msg);
+        return wrap;
+      }
+
+      // Each check is shown with a plain result. Problems are listed first so they stand out.
+      function runDatabaseCheck() {
+        var out = settingsUi.dbOut;
+        out.textContent = 'Checking the database…';
+        api('/api/admin/database').then(function (result) {
+          var problems = result.checks.filter(function (c) { return !c.ok; }).length;
+          out.textContent = '';
+          out.appendChild(el('p', problems ? 'msg' : 'health-ok',
+            problems ? problems + ' check(s) need attention.' : 'The database is working as expected.'));
+          var rows = result.checks
+            .slice()
+            .sort(function (a, b) { return a.ok - b.ok; })
+            .map(function (c) { return [c.name, c.detail, c.ok ? 'OK' : 'Problem']; });
+          out.appendChild(reportTable([{ label: 'Check' }, { label: 'Result' }, { label: 'Status' }], rows));
+        }).catch(function (err) {
+          out.textContent = err.message;
+        });
+      }
+
+      function runHealthCheck() {
+        var out = settingsUi.healthOut;
+        out.textContent = 'Checking…';
+        api('/api/admin/health').then(function (h) {
+          var db = h.database;
+          var clockOff = Math.abs(db.clockDifferenceSeconds) > 60;
+          var slow = db.latencyMs > 1000;
+          var rows = [
+            ['App running for', fmtUptime(h.app.uptimeSeconds)],
+            ['Node.js version', h.app.nodeVersion],
+            ['Database response', db.latencyMs + ' ms' + (slow ? ' (slow)' : '')],
+            ['Clocks agree', clockOff ? 'No: database and app differ by ' + db.clockDifferenceSeconds + ' seconds' : 'Yes'],
+            ['Waiting today', String(db.waitingToday)],
+            ['Being served today', String(db.servingToday)],
+            ['Active admin accounts', String(db.activeAdmins) + (db.activeAdmins < 2 ? ' (consider a second admin)' : '')],
+            ['Old-record cleanup', h.oldRecords.retentionDays ? 'After ' + h.oldRecords.retentionDays + ' days' : 'Off (keeping everything)']
+          ];
+          var healthy = !clockOff && !slow;
+          out.textContent = '';
+          out.appendChild(el('p', healthy ? 'health-ok' : 'msg', healthy ? 'Everything looks healthy.' : 'Something needs attention. See below.'));
+          out.appendChild(reportTable([{ label: 'Check' }, { label: 'Result' }], rows));
+        }).catch(function (err) {
+          out.textContent = err.message;
+        });
+      }
+
+      function runTests() {
+        var btn = settingsUi.testsBtn;
+        btn.disabled = true;
+        settingsUi.testsSummary.textContent = 'Running the tests…';
+        settingsUi.testsOut.classList.add('hidden');
+        api('/api/admin/tests', { method: 'POST' }).then(function (result) {
+          // The runner's summary lines are "ℹ pass N" or "# pass N", depending on its output format.
+          var counts = /(?:ℹ|#) pass (\d+)[\s\S]*?(?:ℹ|#) fail (\d+)/.exec(result.output);
+          var summary = result.passed ? 'All tests passed.' : 'Some tests failed. See the output below.';
+          if (counts) summary += ' (' + counts[1] + ' passed, ' + counts[2] + ' failed)';
+          settingsUi.testsSummary.textContent = summary;
+          settingsUi.testsSummary.className = result.passed ? 'health-ok' : 'msg';
+          settingsUi.testsOut.textContent = result.output || 'No output.';
+          settingsUi.testsOut.classList.remove('hidden');
+          loadAudit();
+        }).catch(function (err) {
+          settingsUi.testsSummary.textContent = err.message;
+        }).finally(function () { btn.disabled = false; });
+      }
+
+      function loadRetention() {
+        api('/api/admin/settings').then(function (s) {
+          settingsUi.retention.days.value = s.retentionDays;
+          settingsUi.retention.action.value = s.retentionAction;
+          settingsUi.retentionInfo.textContent = 'Last cleanup: ' + fmtStamp(s.lastCleanupAt) + '.';
+        }).catch(function (err) {
+          settingsUi.retentionInfo.textContent = err.message;
+        });
+      }
+
+      function runCleanupNow() {
+        var days = Number(settingsUi.retention.days.value);
+        if (!days) { alert('Set a number of days, then save, before running the cleanup.'); return; }
+        var deleting = settingsUi.retention.action.value === 'delete';
+        var message = deleting
+          ? 'Delete every finished ticket older than ' + days + ' days? Reports will no longer include them. This cannot be undone.'
+          : 'Blank out customer names on finished tickets older than ' + days + ' days?';
+        if (!confirm(message)) return;
+        api('/api/admin/cleanup', { method: 'POST' }).then(function (result) {
+          alert(result.changed + ' ticket(s) changed.');
+          loadRetention();
+          loadAudit();
+        }).catch(function (err) { alert(err.message); });
+      }
+
+      function loadAudit() {
+        var out = settingsUi.auditOut;
+        out.textContent = 'Loading…';
+        var term = settingsUi.auditSearch.value.trim();
+        api('/api/admin/audit?limit=200&q=' + encodeURIComponent(term)).then(function (rows) {
+          out.textContent = '';
+          if (!rows.length) {
+            out.appendChild(el('p', 'empty', term ? 'Nothing in the log matches "' + term + '".' : 'Nothing logged yet.'));
+            return;
+          }
+          out.appendChild(reportTable(
+            [{ label: 'When' }, { label: 'Who' }, { label: 'Action' }, { label: 'Target' }, { label: 'Details' }],
+            rows.map(function (r) {
+              return [fmtStamp(r.createdAt), r.actorName, AUDIT_LABEL[r.action] || r.action, r.target || '—', r.detail || '—'];
+            })
+          ));
+        }).catch(function (err) {
+          out.textContent = err.message;
+        });
+      }
+
+      // ================= Tabs & boot =================
+
+      function showTab(tab) {
+        Object.keys(TAB_ACCESS).forEach(function (t) {
+          $('panel-' + t).classList.toggle('hidden', t !== tab);
+        });
+        document.querySelectorAll('.tab-btn').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.tab === tab);
+        });
+        var params = new URLSearchParams(location.search);
+        params.set('tab', tab);
+        history.replaceState(null, '', location.pathname + '?' + params.toString());
+        // The report reloads each time its tab is opened, so it always shows current data.
+        if (tab === 'reports') loadReportRange();
+        if (tab === 'settings') loadSettingsTab();
+        if (tab === 'health') loadAudit();
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { showTab(btn.dataset.tab); });
+      });
+
+      (async function start() {
+        // The password rules and other settings are read from the server before the page is drawn.
+        await window.appSettingsReady;
+        try {
+          state.user = await api('/api/auth/me');
+        } catch (err) {
+          renderDenied('Sign in to access management.');
+          return;
+        }
+        if (state.user.mustChangePassword) { window.location.href = BASE + 'account.html'; return; }
+        if (state.user.role === 'staff') {
+          renderDenied('Your account does not have access to this page.');
+          return;
+        }
+        $('signed-in').textContent = state.user.displayName + ' · ' + ROLE_LABEL[state.user.role];
+
+        // Only show tabs this role is actually allowed into — see TAB_ACCESS above.
+        var availableTabs = Object.keys(TAB_ACCESS).filter(function (t) {
+          return TAB_ACCESS[t].indexOf(state.user.role) >= 0;
+        });
+        if (!availableTabs.length) {
+          renderDenied('Your account does not have access to this page.');
+          return;
+        }
+        document.querySelectorAll('.tab-btn').forEach(function (btn) {
+          btn.classList.toggle('hidden', availableTabs.indexOf(btn.dataset.tab) < 0);
+        });
+
+        var app = $('app');
+        app.textContent = '';
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-services';
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-staff';
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-reports';
+        buildReports(app.lastChild);
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-health';
+        var healthTab = app.lastChild;
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-settings';
+        buildSettings(app.lastChild, healthTab);
+
+        try {
+          var toLoad = [];
+          if (availableTabs.indexOf('services') >= 0) toLoad.push(loadServices());
+          if (availableTabs.indexOf('staff') >= 0) toLoad.push(loadUsers());
+          await Promise.all(toLoad);
+        } catch (err) {
+          renderDenied(err.message || 'Could not load management data.');
+          return;
+        }
+
+        $('tabs').classList.remove('hidden');
+        var requested = new URLSearchParams(location.search).get('tab');
+        showTab(availableTabs.indexOf(requested) >= 0 ? requested : availableTabs[0]);
+      })();
+    })();
+  </script>
+</body>
+</html>

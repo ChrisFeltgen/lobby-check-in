@@ -40,9 +40,11 @@
     /* Tabs: which ones exist is fixed, but which the signed-in account can actually use is
        permission-gated at start() the same way the page itself is — see showTab/start. */
     /* Main tabs: text tabs on a divider line, with an accent underline on the open one. */
-    .tabs { display: flex; gap: 6px; max-width: 1000px; margin: 12px auto 0; padding: 0 20px; border-bottom: 1px solid var(--border); }
-    .tab-btn { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px 9px; min-height: 0; margin-bottom: -1px; font-weight: 600; font-size: 15px; cursor: pointer; transition: color 0.12s ease, border-color 0.12s ease; }
-    .tab-btn:hover { color: var(--fg); }
+    /* On a narrow screen the tabs scroll sideways instead of running off the page. */
+    .tabs { display: flex; gap: 6px; max-width: 1000px; margin: 12px auto 0; padding: 0 20px; box-shadow: inset 0 -1px 0 var(--border); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn, .tab-link { flex: none; white-space: nowrap; background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px 10px; min-height: 0; font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: none; transition: color 0.12s ease, border-color 0.12s ease; }
+    .tab-btn:hover, .tab-link:hover { color: var(--fg); }
     .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
     main { max-width: 1000px; margin: 0 auto; padding: 20px; }
@@ -120,14 +122,32 @@
     .empty { font-size: 14px; color: var(--muted); padding: 4px 0; }
 
     /* Services tab: one card per service, in a grid so the list needs less scrolling. */
-    #panel-services { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
-    .svc-card { border-left: 4px solid var(--muted); display: flex; flex-direction: column; gap: 12px; }
+    #panel-services { display: flex; flex-direction: column; gap: 14px; }
+    .svc-toolbar { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+    .svc-search { flex: 1 1 220px; max-width: 340px; min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    .svc-filters { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .svc-filter { background: var(--card); color: var(--fg); border: 0; border-right: 1px solid var(--border); border-radius: 0; padding: 6px 14px; min-height: 36px; font-size: 14px; font-weight: 600; }
+    .svc-filter:last-child { border-right: 0; }
+    .svc-filter.active { background: var(--accent); color: #fff; }
+    .svc-summary { margin-left: auto; font-size: 14px; color: var(--muted); }
+    .svc-section h3 { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
+    .svc-section h3 .count { font-weight: 400; }
+    .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; align-items: start; }
+    .svc-card { padding: 12px 14px; border-left: 4px solid var(--muted); display: flex; flex-direction: column; gap: 10px; }
     .svc-card > div:empty { display: none; }
     .svc-card.is-open { border-left-color: #2e9e5b; }
     .svc-card.is-closed { border-left-color: var(--danger); }
-    .svc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .svc-title h2 { margin: 0; font-size: 17px; line-height: 1.25; }
-    .svc-route { margin-top: 3px; font-size: 13px; color: var(--muted); }
+    .svc-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .svc-title h2 { margin: 0; font-size: 16px; line-height: 1.25; }
+    .svc-code { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .svc-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .svc-actions .spacer { flex: 1; }
+    .svc-actions button { min-height: 34px; padding: 4px 12px; font-size: 14px; }
+    .svc-actions button.sched-toggle { font-weight: 500; color: var(--muted); }
+    .svc-actions button.sched-toggle.has-schedules { color: var(--fg); }
+    .svc-caption { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+    .svc-sched { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .svc-sched.hidden { display: none; }
     .closed-banner { font-size: 14px; line-height: 1.4; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--danger) 12%, var(--card)); color: var(--danger); }
     .override-row { margin-top: 0; }
     .health-ok { font-weight: 600; color: #2e9e5b; margin: 0 0 8px; }
@@ -158,18 +178,23 @@
     .modal label.check-row { font-size: 13px; }
     /* Fixed column widths: editing a row must not re-flow the other rows. */
     .staff-table { table-layout: fixed; }
-    .staff-table th:nth-child(1) { width: 19%; }
-    .staff-table th:nth-child(2) { width: 16%; }
+    .staff-table th:nth-child(1) { width: 20%; }
+    .staff-table th:nth-child(2) { width: 14%; }
     .staff-table th:nth-child(3) { width: 11%; }
     .staff-table th:nth-child(4) { width: 9%; }
-    .staff-table th:nth-child(5) { width: 13%; }
-    .staff-table th:nth-child(6) { width: 32%; }
+    .staff-table th:nth-child(5) { width: 19%; }
+    .staff-table th:nth-child(6) { width: 27%; }
+    .staff-table td { overflow-wrap: anywhere; }
+    .staff-table td:nth-child(5) { white-space: nowrap; }
+    /* Narrow screens: the accounts table scrolls sideways instead of squeezing its buttons. */
+    .table-scroll { overflow-x: auto; }
+    .table-scroll .staff-table { min-width: 720px; }
+    /* The add-account form: the fields in a row, then the tick box and the button together beneath them. */
+    .form-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+    .form-actions label.check-row { flex: 1 1 280px; }
+    .form-actions button { flex: none; }
     .schedules-head { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
     .add-schedule { width: 100%; border-style: dashed; }
-    .override-options { display: flex; flex-direction: column; gap: 10px; }
-    .override-option { display: flex; align-items: center; gap: 12px; }
-    .override-option button { flex: none; min-width: 150px; }
-    .override-desc { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 
     /* Reports dialog: opened from the header, one day at a time */
     .report-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
@@ -233,11 +258,12 @@
   </header>
 
   <nav class="tabs hidden" id="tabs">
-    <button class="tab-btn" data-tab="services" type="button">Services</button>
+    <button class="tab-btn" data-tab="services" type="button">Open &amp; close</button>
     <button class="tab-btn" data-tab="staff" type="button">Staff</button>
     <button class="tab-btn" data-tab="reports" type="button">Reports</button>
     <button class="tab-btn" data-tab="settings" type="button">Settings</button>
     <button class="tab-btn" data-tab="health" type="button">Health &amp; audit</button>
+    <a class="tab-link hidden" id="catalog-link" href="catalog.html">Services &amp; languages</a>
   </nav>
 
   <main id="app">
@@ -248,7 +274,7 @@
   <script>
     (function () {
       var BASE = location.pathname.replace(/[^/]*$/, '');
-      var state = { user: null, services: [], users: [], editing: null };
+      var state = { user: null, services: [], users: [], editing: null, svcUi: { search: '', filter: 'all', open: {} } };
       var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
       var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       var NTH_LABELS = { '1': '1st', '2': '2nd', '3': '3rd', '4': '4th', 'last': 'last' };
@@ -527,11 +553,12 @@
       function renderServicePanel(svc) {
         var panel = el('div', 'panel svc-card ' + (svc.available ? 'is-open' : 'is-closed'));
 
-        // Name on the left with its route beneath it in muted text; the status badge on the right.
+        // Name on the left, the open or closed badge on the right. The department is the heading of its section.
         var head = el('div', 'svc-head');
         var titles = el('div', 'svc-title');
-        titles.appendChild(el('h2', null, svc.name));
-        if (svc.route) titles.appendChild(el('div', 'svc-route', svc.route));
+        var title = el('h2', null, svc.name);
+        title.appendChild(el('span', 'svc-code', svc.code));
+        titles.appendChild(title);
         head.appendChild(titles);
         head.appendChild(el('span', 'status-pill ' + (svc.available ? 'status-open' : 'status-closed'), svc.available ? 'Open' : 'Closed'));
         panel.appendChild(head);
@@ -543,19 +570,14 @@
 
         var formContainer = el('div');
 
-        // Each choice is a button with a plain-language line beside it, so it's clear what it does.
-        var options = el('div', 'override-options');
-        function addOption(button, text) {
-          var row = el('div', 'override-option');
-          row.appendChild(button);
-          row.appendChild(el('p', 'override-desc', text));
-          options.appendChild(row);
-        }
-        function overrideButton(label, variant, onClick) {
+        // One row of buttons. What each does is in its tooltip; the states that need explaining get a line below.
+        var actions = el('div', 'svc-actions');
+        function actionButton(label, variant, tip, onClick) {
           var b = el('button', variant, label);
           b.type = 'button';
+          b.title = tip;
           b.addEventListener('click', onClick);
-          return b;
+          actions.appendChild(b);
         }
         function runOverride(override) {
           return function () { doOverride(svc.code, override).then(loadServices).catch(function (err) { alert(err.message); }); };
@@ -563,31 +585,45 @@
 
         var closedBySchedule = !svc.available && svc.source === 'schedule';
         var closedManually = !svc.available && svc.source === 'manual';
+        var caption = '';
 
         if (svc.available) {
-          addOption(overrideButton('Close now…', 'secondary', function () { openCloseForm(formContainer, svc); }),
-            'Keeps it closed until you reopen it. You can set a time for it to reopen automatically.');
+          actionButton('Close now…', 'secondary', 'Keeps it closed until you reopen it. You can set a time for it to reopen automatically.',
+            function () { openCloseForm(formContainer, svc); });
         } else if (closedBySchedule) {
-          addOption(overrideButton('Keep closed…', 'secondary', function () { openCloseForm(formContainer, svc); }),
-            'Stays closed after the scheduled closure ends, until you reopen it.');
-          addOption(overrideButton('Open now', 'primary', runOverride('open')),
-            'Opens it now, but only until the scheduled closure ends. Then it closes as scheduled.');
+          actionButton('Open now', 'primary', 'Opens it now, but only until the scheduled closure ends. Then it closes as scheduled.', runOverride('open'));
+          actionButton('Keep closed…', 'secondary', 'Stays closed after the scheduled closure ends, until you reopen it.',
+            function () { openCloseForm(formContainer, svc); });
+          caption = 'Open now opens it only until the scheduled closure ends. Keep closed holds it shut until you reopen it.';
         } else {
-          addOption(overrideButton('Reopen', 'primary', runOverride('open')),
-            'Lifts the manual closure. Recurring closures apply again.');
+          actionButton('Reopen', 'primary', 'Lifts the manual closure. Recurring closures apply again.', runOverride('open'));
         }
-
         // Only worth offering when an override is in place and isn't already the manual closure above.
         if (svc.manualOverride !== 'none' && !closedManually) {
-          addOption(overrideButton('Return to schedule', 'secondary', runOverride('none')),
-            'Drops any manual open or close, so recurring closures apply again.');
+          actionButton('Return to schedule', 'secondary', 'Drops any manual open or close, so recurring closures apply again.', runOverride('none'));
         }
-        panel.appendChild(options);
+
+        // The recurring closures stay folded away until asked for, so the page is a list of services, not a wall of forms.
+        var sched = el('div', 'svc-sched' + (state.svcUi.open[svc.code] ? '' : ' hidden'));
+        var toggle = el('button', 'secondary sched-toggle' + (svc.schedules.length ? ' has-schedules' : ''));
+        toggle.type = 'button';
+        function toggleLabel() {
+          toggle.textContent = 'Recurring closures' + (svc.schedules.length ? ' (' + svc.schedules.length + ')' : '') + (sched.classList.contains('hidden') ? ' ▾' : ' ▴');
+          toggle.setAttribute('aria-expanded', sched.classList.contains('hidden') ? 'false' : 'true');
+        }
+        toggle.addEventListener('click', function () {
+          sched.classList.toggle('hidden');
+          state.svcUi.open[svc.code] = !sched.classList.contains('hidden');
+          toggleLabel();
+        });
+        actions.appendChild(el('span', 'spacer'));
+        actions.appendChild(toggle);
+        panel.appendChild(actions);
+        if (caption) panel.appendChild(el('p', 'svc-caption', caption));
         panel.appendChild(formContainer);
 
-        panel.appendChild(el('div', 'schedules-head', 'Recurring closures (' + svc.schedules.length + ')'));
         if (!svc.schedules.length) {
-          panel.appendChild(el('div', 'empty', 'No recurring closures.'));
+          sched.appendChild(el('div', 'empty', 'No recurring closures.'));
         } else {
           svc.schedules.forEach(function (s, idx) {
             var isLast = idx === svc.schedules.length - 1;
@@ -599,23 +635,23 @@
 
             var editContainer = el('div');
 
-            var actions = el('div', 'schedule-actions');
+            var rowActions = el('div', 'schedule-actions');
             var edit = el('button', 'secondary', 'Edit');
             edit.type = 'button';
             edit.addEventListener('click', function () { openScheduleForm(editContainer, svc, s); });
-            var toggle = el('button', 'secondary', s.active ? 'Pause' : 'Resume');
-            toggle.type = 'button';
-            toggle.addEventListener('click', function () { toggleSchedule(s.id, !s.active); });
+            var pause = el('button', 'secondary', s.active ? 'Pause' : 'Resume');
+            pause.type = 'button';
+            pause.addEventListener('click', function () { toggleSchedule(s.id, !s.active); });
             var del = el('button', 'danger', 'Delete');
             del.type = 'button';
             del.addEventListener('click', function () { deleteScheduleRow(s.id); });
-            actions.appendChild(edit);
-            actions.appendChild(toggle);
-            actions.appendChild(del);
-            row.appendChild(actions);
+            rowActions.appendChild(edit);
+            rowActions.appendChild(pause);
+            rowActions.appendChild(del);
+            row.appendChild(rowActions);
 
-            panel.appendChild(row);
-            panel.appendChild(editContainer);
+            sched.appendChild(row);
+            sched.appendChild(editContainer);
           });
         }
 
@@ -623,18 +659,105 @@
         var addBtn = el('button', 'secondary add-schedule', '+ Add recurring closure');
         addBtn.type = 'button';
         addBtn.addEventListener('click', function () { openScheduleForm(addScheduleContainer, svc, null); });
-        panel.appendChild(addBtn);
-        panel.appendChild(addScheduleContainer);
+        sched.appendChild(addBtn);
+        sched.appendChild(addScheduleContainer);
+        panel.appendChild(sched);
+        toggleLabel();
 
         return panel;
       }
 
+      // The toolbar is built once, so typing in the search box is not interrupted when the list below is drawn again.
+      function buildServicesToolbar(panel) {
+        var bar = el('div', 'svc-toolbar');
+        var search = document.createElement('input');
+        search.type = 'search';
+        search.className = 'svc-search';
+        search.placeholder = 'Search services';
+        search.setAttribute('aria-label', 'Search services');
+        search.value = state.svcUi.search;
+        search.addEventListener('input', function () { state.svcUi.search = search.value; renderServiceList(); });
+        bar.appendChild(search);
+
+        var filters = el('div', 'svc-filters');
+        [['all', 'All'], ['closed', 'Closed'], ['scheduled', 'With recurring closures']].forEach(function (f) {
+          var b = el('button', 'svc-filter', f[1]);
+          b.type = 'button';
+          b.setAttribute('data-filter', f[0]);
+          b.addEventListener('click', function () { state.svcUi.filter = f[0]; renderServiceList(); });
+          filters.appendChild(b);
+        });
+        bar.appendChild(filters);
+        bar.appendChild(el('span', 'svc-summary'));
+        panel.appendChild(bar);
+        var list = el('div');
+        list.id = 'svc-sections';
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.gap = '18px';
+        panel.appendChild(list);
+      }
+
+      // The list: services in the order the kiosk shows them, under the department group they belong to.
+      function renderServiceList() {
+        var all = state.services;
+        var closedCount = all.filter(function (v) { return !v.available; }).length;
+        if (state.svcUi.filter === 'closed' && !closedCount) state.svcUi.filter = 'all';
+        var ui = state.svcUi;
+
+        var panel = $('panel-services');
+        panel.querySelector('.svc-summary').textContent = all.length + (all.length === 1 ? ' service' : ' services') + ' · ' +
+          (all.length - closedCount) + ' open · ' + closedCount + ' closed';
+        Array.prototype.forEach.call(panel.querySelectorAll('.svc-filter'), function (b) {
+          b.classList.toggle('active', b.getAttribute('data-filter') === ui.filter);
+        });
+
+        var needle = ui.search.trim().toLowerCase();
+        var shown = all.filter(function (v) {
+          if (ui.filter === 'closed' && v.available) return false;
+          if (ui.filter === 'scheduled' && !v.schedules.length) return false;
+          return !needle || v.name.toLowerCase().indexOf(needle) >= 0 || v.code.toLowerCase().indexOf(needle) >= 0;
+        });
+
+        // Sections in the order their first service appears; services with no group go last.
+        var sections = [];
+        var byLabel = {};
+        shown.forEach(function (v) {
+          var label = v.groupLabel || null;
+          var key = label === null ? '\u0000other' : label;
+          if (!byLabel[key]) { byLabel[key] = { label: label, items: [] }; sections.push(byLabel[key]); }
+          byLabel[key].items.push(v);
+        });
+        sections.sort(function (a, b) { return (a.label === null) - (b.label === null); });
+
+        var list = $('svc-sections');
+        list.textContent = '';
+        if (!shown.length) {
+          list.appendChild(el('div', 'empty', all.length ? 'No services match.' : 'No services yet.'));
+          return;
+        }
+        var headed = sections.length > 1 || sections[0].label !== null;
+        sections.forEach(function (section) {
+          var box = el('section', 'svc-section');
+          if (headed) {
+            var h = el('h3', null, section.label || 'Other services');
+            h.appendChild(el('span', 'count', String(section.items.length)));
+            box.appendChild(h);
+          }
+          var grid = el('div', 'svc-grid');
+          section.items.forEach(function (v) { grid.appendChild(renderServicePanel(v)); });
+          box.appendChild(grid);
+          list.appendChild(box);
+        });
+      }
+
       function renderServicesTab() {
         var panel = $('panel-services');
-        panel.textContent = '';
-        // Alphabetical by name. Sorts a copy so state.services keeps the server's order.
-        state.services.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
-          .forEach(function (svc) { panel.appendChild(renderServicePanel(svc)); });
+        if (!$('svc-sections')) {
+          panel.textContent = '';
+          buildServicesToolbar(panel);
+        }
+        renderServiceList();
       }
 
       async function loadServices() {
@@ -855,8 +978,10 @@
         var mustChangeLabel = el('label', 'check-row');
         mustChangeLabel.appendChild(mustChange);
         mustChangeLabel.appendChild(document.createTextNode(' Require user to change password on next sign-on'));
-        form.appendChild(mustChangeLabel);
-        form.appendChild(addBtn);
+        var formActions = el('div', 'form-actions');
+        formActions.appendChild(mustChangeLabel);
+        formActions.appendChild(addBtn);
+        form.appendChild(formActions);
         var err = el('p', 'msg');
         createPanel.appendChild(form);
         createPanel.appendChild(err);
@@ -905,7 +1030,9 @@
         }
         state.users.forEach(function (u) { tbody.appendChild(userRow(u)); });
         table.appendChild(tbody);
-        listPanel.appendChild(table);
+        var scroller = el('div', 'table-scroll');
+        scroller.appendChild(table);
+        listPanel.appendChild(scroller);
         panel.appendChild(listPanel);
       }
 
@@ -945,7 +1072,10 @@
       }
       function fmtMinutes(m) { return m === null ? '—' : m < 1 ? '< 1 min' : Math.round(m) + ' min'; }
       function fmtClock(iso) { return iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—'; }
+      // Reports include services that have been turned off or deleted, so names come with the report; the
+      // list of services that are on is the fallback.
       function serviceName(code) {
+        if (report.names && report.names[code]) return report.names[code];
         var s = state.services.find(function (c) { return c.code === code; });
         return s ? s.name : code;
       }
@@ -1222,6 +1352,8 @@
           var data = await api('/api/reports/range?from=' + encodeURIComponent(report.from) + '&to=' + encodeURIComponent(report.to));
           if (seq !== report.seq) return;
           report.tickets = data.tickets;
+          report.names = {};
+          (data.services || []).forEach(function (s) { report.names[s.code] = s.name; });
         } catch (err) {
           if (seq !== report.seq) return;
           report.tickets = [];
@@ -1333,7 +1465,18 @@
         'settings.update': 'Settings changed',
         'cleanup.run': 'Old-record cleanup',
         'tickets.auto_close': 'End-of-day close',
-        'tests.run': 'Automated tests run'
+        'tests.run': 'Automated tests run',
+        'service.create': 'Service added',
+        'service.update': 'Service changed',
+        'service.delete': 'Service removed',
+        'layout.update': 'Kiosk layout changed',
+        'group.create': 'Department group added',
+        'group.update': 'Department group changed',
+        'group.delete': 'Department group removed',
+        'language.create': 'Language added',
+        'language.update': 'Language changed',
+        'language.delete': 'Language removed',
+        'translations.update': 'Translations changed'
       };
 
       var settingsUi = {};
@@ -1414,7 +1557,7 @@
         // Automated tests: runs the same checks as `npm test`, so no command line is needed.
         var testsPanel = el('div', 'panel');
         testsPanel.appendChild(el('h2', null, 'Automated tests'));
-        testsPanel.appendChild(el('p', 'muted', 'Checks the sign-in rules, the closure rules, the report date rules and the database setup file. Takes a few seconds.'));
+        testsPanel.appendChild(el('p', 'muted', 'Checks the sign-in rules, the closure rules, the report date rules, the services and languages rules and the database setup file. Takes a few seconds.'));
         var testsBtn = el('button', 'primary', 'Run tests');
         testsBtn.type = 'button';
         testsBtn.addEventListener('click', runTests);
@@ -1853,6 +1996,7 @@
         }
 
         $('tabs').classList.remove('hidden');
+        $('catalog-link').classList.toggle('hidden', state.user.role !== 'admin');
         var requested = new URLSearchParams(location.search).get('tab');
         showTab(availableTabs.indexOf(requested) >= 0 ? requested : availableTabs[0]);
       })();

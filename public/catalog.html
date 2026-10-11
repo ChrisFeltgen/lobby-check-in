@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Services &amp; languages · Lobby Check-In</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="theme.js"></script>
+  <style>
+    body { font-size: 15px; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+
+    /* Header bar and main tabs: the same as Management, so moving between its pages feels like one place. */
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: linear-gradient(90deg, #0a4670 0%, #0b6a9c 100%); color: #fff; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .logo-wrap { background: #fff; border-radius: 8px; padding: 4px 8px; display: flex; }
+    .logo { max-height: 40px; width: auto; display: block; }
+    .top h1 { margin: 0; font-size: 22px; font-weight: 700; color: #fff; }
+    .top .sub { margin: 2px 0 0; font-size: 14px; opacity: 0.85; }
+    .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .top-actions a { color: #fff; text-decoration: none; display: inline-flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 15px; white-space: nowrap; transition: background-color 0.12s ease; }
+    .top-actions a:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions a[aria-current="page"] { background: rgba(255, 255, 255, 0.2); }
+    .top-actions .divider { width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.3); margin: 0 2px; }
+    @media (max-width: 720px) { .top-actions { width: 100%; justify-content: flex-end; } }
+    .top-actions button.ghost { background: transparent; color: #fff; height: 38px; min-height: 0; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 15px; border: 1px solid rgba(255, 255, 255, 0.55); }
+    .top-actions button.ghost:hover { background: rgba(255, 255, 255, 0.14); }
+    .top-actions #theme-toggle { width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+
+    .tabs { display: flex; gap: 6px; max-width: 1000px; margin: 12px auto 0; padding: 0 20px; box-shadow: inset 0 -1px 0 var(--border); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar, .subtabs::-webkit-scrollbar { display: none; }
+    .tabs a { flex: none; white-space: nowrap; border-bottom: 3px solid transparent; color: var(--muted); padding: 10px 14px 10px; font-weight: 600; font-size: 15px; text-decoration: none; transition: color 0.12s ease, border-color 0.12s ease; }
+    .tabs a:hover { color: var(--fg); }
+    .tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+    main { max-width: 1000px; margin: 0 auto; padding: 16px 20px 24px; }
+
+    /* Sections inside this page: connected switcher, like the report views on Management. */
+    .subtabs { display: inline-flex; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border: 1px solid var(--border); border-radius: 8px; margin: 16px 20px 0; background: var(--card); }
+    .subtab-wrap { max-width: 1000px; margin: 0 auto; }
+    .subtab-btn { flex: none; background: var(--card); color: var(--fg); border: 0; border-right: 1px solid var(--border); border-radius: 0; min-height: 38px; padding: 8px 16px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+    .subtab-btn:last-child { border-right: 0; }
+    .subtab-btn:hover { background: var(--bg); }
+    .subtab-btn.active { background: var(--accent); color: var(--accent-fg); }
+
+    h2 { margin: 0 0 4px; font-size: 18px; }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+    .intro { margin: 0 0 14px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+    .msg { min-height: 20px; margin: 0; font-size: 14px; color: var(--danger); }
+    .msg.ok { color: #2e9e5b; }
+
+    input, select, textarea, button { font-family: inherit; }
+    input[type="text"], input[type="number"], select, textarea { width: 100%; min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    textarea { resize: vertical; line-height: 1.35; }
+    input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: none; }
+    input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button { min-height: 38px; padding: 6px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--fg); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    button.danger { background: color-mix(in srgb, var(--danger) 10%, var(--card)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--card)); }
+    button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 18%, var(--card)); }
+    button:disabled { opacity: 0.45; cursor: default; }
+
+    /* Labelled fields in a 12-column grid. Each field says how many columns it takes. */
+    .fields { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; grid-column: span 12; }
+    .field .hint { font-size: 12px; font-weight: 400; }
+    @media (min-width: 720px) {
+      .c3 { grid-column: span 3; } .c2 { grid-column: span 2; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; } .c7 { grid-column: span 7; }
+    }
+    @media (min-width: 480px) and (max-width: 719px) { .c2, .c3, .c4 { grid-column: span 6; } }
+
+    /* Adding: a closed section until it is needed, so the list stays in front. */
+    details.add { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+    details.add > summary { cursor: pointer; padding: 12px 18px; font-weight: 700; font-size: 15px; list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 10px; }
+    details.add > summary::-webkit-details-marker { display: none; }
+    details.add > summary::before { content: "+"; display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: var(--accent-fg); font-size: 16px; line-height: 1; }
+    details.add[open] > summary::before { content: "–"; }
+    details.add > summary:hover { background: var(--bg); }
+    details.add .add-body { padding: 4px 18px 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .form-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+    .form-foot .msg { flex: 1; min-width: 160px; }
+
+    /* One card per service or group: its header, its fields, and its own Save. */
+    .list { display: flex; flex-direction: column; gap: 12px; }
+    .item-card { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+    .item-card.is-off { border-left-color: var(--muted); }
+    .item-card.is-off .item-code, .item-card.is-off .icon-preview { opacity: 0.6; }
+    .item-card.is-dirty { border-color: var(--accent); }
+    .item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 30px; }
+    .item-code { font-size: 16px; font-weight: 700; }
+    .item-note { font-size: 13px; color: var(--muted); }
+    .item-head .spacer { flex: 1; }
+    .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); cursor: pointer; }
+    .pill { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; padding: 3px 9px; border-radius: 999px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+    .option-row { grid-column: span 12; display: flex; flex-wrap: wrap; gap: 8px 28px; padding-top: 2px; }
+    .option-row .switch { align-items: flex-start; font-size: 14px; }
+    .option-row .switch input { margin-top: 2px; }
+    .option-row .switch small { display: block; color: var(--muted); font-size: 12px; }
+    .item-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .item-foot .row-msg { flex: 1; min-width: 120px; margin: 0; font-size: 13px; color: var(--danger); }
+    .item-foot .row-msg.ok { color: #2e9e5b; }
+    .empty { padding: 20px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 10px; }
+
+    /* Kiosk layout: the rows as the kiosk draws them, with tiles to drag between them. */
+    .board-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap; }
+    .board-head > div:first-child { flex: 1 1 420px; }
+    .board-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .panel.is-dirty { border-color: var(--accent); }
+    .board { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .board-row { display: flex; align-items: stretch; gap: 10px; }
+    .board-row .row-label { flex: none; width: 58px; padding-top: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+    .board-row.is-long .row-label { color: var(--danger); }
+    .board-zone { flex: 1; min-width: 0; min-height: 60px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px; background: var(--bg); }
+    .board-zone.is-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
+    .board-zone .zone-empty { font-size: 13px; color: var(--muted); padding: 0 6px; }
+    .board-tools { flex: none; display: flex; align-items: center; }
+    .board-tools button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+    .tile-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 250px; min-height: 0; padding: 7px 12px 7px 8px; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px; background: var(--card); color: var(--fg); font-size: 14px; font-weight: 600; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .tile-chip:hover { border-color: var(--accent); }
+    .tile-chip .icon-preview { width: 20px; height: 20px; }
+    .tile-chip .icon-preview svg { width: 18px; height: 18px; }
+    .tile-chip .nm { font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .tile-chip.is-dragging { opacity: 0.3; }
+    .drag-ghost { position: fixed; z-index: 200; margin: 0; pointer-events: none; opacity: 0.95; cursor: grabbing; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); }
+    .drop-marker { flex: none; width: 4px; align-self: stretch; min-height: 34px; border-radius: 2px; background: var(--accent); }
+    #layout-add-row { margin-top: 10px; border-style: dashed; width: 100%; }
+    #layout-add-row.is-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+    .field-note { margin: 0; font-size: 13px; color: var(--muted); }
+    .layout-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+    .layout-note:empty { display: none; }
+    .layout-note.warn { color: var(--danger); }
+
+    /* Icon picker: a button showing the chosen icon, and a grid to choose from. */
+    .icon-preview { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; color: var(--accent); flex: none; }
+    .icon-preview svg { width: 22px; height: 22px; }
+    .picker { position: relative; }
+    .picker-btn { width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 15px; text-align: left; }
+    .picker-btn .icon-preview { width: 22px; height: 22px; }
+    .picker-btn .icon-preview svg { width: 18px; height: 18px; }
+    .picker-btn .caret { margin-left: auto; opacity: 0.6; font-size: 11px; }
+    .icon-pop { position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 4px; padding: 8px; display: grid; grid-template-columns: repeat(6, 40px); gap: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
+    .icon-pop.align-right { left: auto; right: 0; }
+    .icon-pop button { width: 40px; height: 40px; min-height: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--accent); }
+    .icon-pop button.none { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .icon-pop button.selected { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+    .icon-pop svg { width: 22px; height: 22px; }
+
+    /* Colour: a swatch to pick from, and the hex value beside it. */
+    .color-field { display: flex; gap: 6px; align-items: center; }
+    .color-field input[type="color"] { flex: none; width: 42px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); cursor: pointer; }
+    .color-field input[type="text"] { min-width: 0; }
+    .color-field.is-empty input[type="color"] { opacity: 0.35; }
+
+    /* Translations */
+    .tr-bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+    .tr-bar .field { grid-column: auto; min-width: 220px; }
+    .tr-bar .switch { min-height: 38px; }
+    .tr-progress { margin-left: auto; font-size: 14px; color: var(--muted); min-height: 38px; display: flex; align-items: center; }
+    .section-title { margin: 22px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
+    .translate-item { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .translate-item .t-label { font-size: 13px; font-weight: 600; padding-top: 8px; overflow-wrap: anywhere; }
+    .translate-item .english { color: var(--muted); font-size: 14px; line-height: 1.35; padding-top: 8px; overflow-wrap: anywhere; }
+    .translate-item .english:empty::before { content: "(empty)"; opacity: 0.6; }
+    .translate-item.is-changed input, .translate-item.is-changed textarea { border-color: var(--accent); }
+    .only-todo .translate-item.is-done, .only-todo .section-title.is-done { display: none; }
+    .tr-head { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; padding: 14px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 600; }
+    @media (max-width: 719px) {
+      .translate-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+      .translate-item .t-label, .translate-item .english { padding-top: 0; }
+      .tr-head { display: none; }
+      .tr-progress { margin-left: 0; }
+    }
+    .save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px -18px -16px; padding: 12px 18px; background: var(--card); border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+    .save-bar .msg { flex: 1; min-width: 160px; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <div>
+        <p class="org-label" data-org-name hidden></p>
+        <h1>Services &amp; languages</h1>
+        <p class="sub" id="signed-in"></p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a href="queue.html">Queue Portal</a>
+      <a id="manage-link" class="hidden" href="manage.html">Management</a>
+      <a href="account.html">My account</a>
+      <button id="signout" class="ghost" type="button">Sign out</button>
+      <span class="divider"></span>
+      <button id="theme-toggle" class="ghost" type="button" aria-label="Switch theme" title="Switch theme"><span class="theme-icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="theme-icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="5"/></svg></span></button>
+    </div>
+  </header>
+
+  <nav class="tabs hidden" id="manage-tabs" aria-label="Management">
+    <a href="manage.html?tab=services">Open &amp; close</a>
+    <a href="manage.html?tab=staff">Staff</a>
+    <a href="manage.html?tab=reports">Reports</a>
+    <a id="nav-settings" class="hidden" href="manage.html?tab=settings">Settings</a>
+    <a id="nav-health" class="hidden" href="manage.html?tab=health">Health &amp; audit</a>
+    <a id="nav-catalog" class="hidden" href="catalog.html" aria-current="page">Services &amp; languages</a>
+  </nav>
+
+  <main id="denied" class="hidden">
+    <section class="panel">
+      <h2 id="denied-title">Admins only</h2>
+      <p class="intro" id="denied-text" style="margin:0">Services and languages are changed by admins.</p>
+    </section>
+  </main>
+
+  <div class="subtab-wrap hidden" id="tabs">
+    <nav class="subtabs" aria-label="Sections">
+      <button class="subtab-btn" data-tab="services" type="button">Services</button>
+      <button class="subtab-btn" data-tab="groups" type="button">Department groups</button>
+      <button class="subtab-btn" data-tab="languages" type="button">Languages</button>
+      <button class="subtab-btn" data-tab="translations" type="button">Translations</button>
+    </nav>
+  </div>
+
+  <main id="app" class="hidden">
+    <!-- Services -->
+    <section id="panel-services">
+      <details class="add" id="svc-add-box">
+        <summary>Add a service</summary>
+        <div class="add-body">
+          <p class="intro">A service needs a code (2 to 10 letters or numbers) and a name. A description and an icon help customers choose. The service shows on the kiosk as soon as it is added.</p>
+          <div class="fields">
+            <label class="field c3">Code<input type="text" id="svc-new-code" maxlength="10" placeholder="e.g. TAX" autocomplete="off"></label>
+            <label class="field c5">Name<input type="text" id="svc-new-name" maxlength="100"></label>
+            <label class="field c4">Department group<select id="svc-new-group"></select></label>
+            <label class="field c12" style="grid-column: span 12">Description<input type="text" id="svc-new-description" maxlength="255" placeholder="One short line shown under the name on the kiosk"></label>
+            <div class="field c4">Icon<div id="svc-new-icon-slot"></div></div>
+            <div class="field c4">Colour on the monitor<div id="svc-new-color-slot"></div><span class="hint">Used when the service is not in a group.</span></div>
+            <div class="option-row">
+              <label class="switch"><input type="checkbox" id="svc-new-appt"><span>Asks who they are seeing and the appointment time<small>For appointment check-in. The kiosk and the walk-in form ask the two questions.</small></span></label>
+              <label class="switch"><input type="checkbox" id="svc-new-pinned"><span>Always in staff watched queues<small>Staff cannot unwatch it, and it sits first in their list.</small></span></label>
+            </div>
+            <p class="field-note" style="grid-column: span 12">A new service goes at the end of the last kiosk row, or on a new row when that one is full. Move it in the Kiosk layout above.</p>
+          </div>
+          <div class="form-foot">
+            <button class="primary" id="svc-add" type="button">Add service</button>
+            <p class="msg" id="svc-add-msg" role="status"></p>
+          </div>
+        </div>
+      </details>
+      <div class="panel" id="svc-layout-box">
+        <div class="board-head">
+          <div>
+            <h2>Kiosk layout</h2>
+            <p class="intro" style="margin:0">Drag a service to move it: along its row, to another row, or onto <strong>Add a row</strong> to start a new one. With a service selected, the arrow keys move it too. Nothing changes on the kiosk until you press <strong>Save layout</strong>.</p>
+          </div>
+          <div class="board-actions">
+            <button type="button" id="layout-discard" disabled>Discard changes</button>
+            <button type="button" class="primary" id="layout-save" disabled>Save layout</button>
+          </div>
+        </div>
+        <div class="board" id="svc-layout" aria-label="Kiosk rows"></div>
+        <button type="button" id="layout-add-row">+ Add a row</button>
+        <p class="layout-note" id="svc-layout-note"></p>
+        <p class="msg" id="layout-msg" role="status" style="margin-top:8px"></p>
+      </div>
+      <p class="intro">Change a service and press Save on its card. A service with customers on record cannot be deleted; turn it off instead, so its history stays in the reports. Services are listed in the order they appear on the kiosk.</p>
+      <div class="list" id="svc-list"></div>
+    </section>
+
+    <!-- Department groups -->
+    <section id="panel-groups" class="hidden">
+      <details class="add" id="grp-add-box">
+        <summary>Add a department group</summary>
+        <div class="add-body">
+          <p class="intro">Services in the same group share one card on the lobby monitor, for example Building Dept. A group needs a short id, such as "permits". The id cannot be changed later.</p>
+          <div class="fields">
+            <label class="field c3">Id<input type="text" id="grp-new-id" maxlength="40" placeholder="e.g. permits" autocomplete="off"></label>
+            <label class="field c5">Name<input type="text" id="grp-new-label" maxlength="100"></label>
+            <div class="field c4">Icon<div id="grp-new-icon-slot"></div></div>
+            <div class="field c4">Colour<div id="grp-new-color-slot"></div></div>
+          </div>
+          <div class="form-foot">
+            <button class="primary" id="grp-add" type="button">Add group</button>
+            <p class="msg" id="grp-add-msg" role="status"></p>
+          </div>
+        </div>
+      </details>
+      <p class="intro">A group that still has services cannot be deleted. Move those services to another group first. To show a new group on a monitor, choose it in Settings, under Lobby monitor.</p>
+      <div class="list" id="grp-list"></div>
+    </section>
+
+    <!-- Languages -->
+    <section id="panel-languages" class="hidden">
+      <details class="add" id="lang-add-box">
+        <summary>Add a language</summary>
+        <div class="add-body">
+          <p class="intro">Add a language, then translate the services, groups and kiosk wording for it on the Translations tab. The kiosk offers a language as soon as it is on. Use the language's own name, such as Español.</p>
+          <div class="fields">
+            <label class="field c3">Code<input type="text" id="lang-new-code" maxlength="10" placeholder="e.g. pt-br" autocomplete="off"></label>
+            <label class="field c5">Name<input type="text" id="lang-new-name" maxlength="50"></label>
+          </div>
+          <div class="form-foot">
+            <button class="primary" id="lang-add" type="button">Add language</button>
+            <p class="msg" id="lang-add-msg" role="status"></p>
+          </div>
+        </div>
+      </details>
+      <p class="intro">English is always available. Turn a language off to hide it from the kiosk without losing its translations.</p>
+      <div class="list" id="lang-list"></div>
+    </section>
+
+    <!-- Translations -->
+    <section id="panel-translations" class="hidden">
+      <div class="panel">
+        <div class="tr-bar">
+          <label class="field">Language to translate<select id="tr-lang"></select></label>
+          <label class="switch"><input type="checkbox" id="tr-todo"> Show only items still to translate</label>
+          <span class="tr-progress" id="tr-count"></span>
+        </div>
+        <p class="intro" style="margin:12px 0 0">The English is shown beside each item. Leave a box empty to use the English on the kiosk.</p>
+        <div class="tr-head" id="tr-head"><span>Item</span><span>English</span><span>Translation</span></div>
+        <div id="tr-body"></div>
+        <div class="save-bar">
+          <button class="primary" id="tr-save" type="button">Save translations</button>
+          <span class="msg" id="tr-msg" role="status"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app-settings.js"></script>
+  <script src="icons.js"></script>
+  <script>
+    (function () {
+      var BASE = location.pathname.replace(/[^/]*$/, '');
+      var TABS = ['services', 'groups', 'languages', 'translations'];
+      var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
+      var COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+      var MAX_TILES = 4; // tiles a kiosk row is planned for (ROW_TILES in catalog.js)
+      var state = { catalog: null, translations: null, trLang: '', trToken: 0, stale: false, saved: '' };
+      // Cards whose fields have been changed but not saved yet.
+      var dirtyCards = new Set();
+
+      function $(id) { return document.getElementById(id); }
+
+      function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      }
+
+      async function api(path, opts) {
+        opts = opts || {};
+        var res = await fetch(BASE + path, {
+          method: opts.method || 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: opts.body,
+          credentials: 'same-origin'
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.status === 401) { window.location.href = BASE + 'index.html?next=catalog.html'; throw new Error('Sign in required'); }
+        if (res.status === 403 && data.code === 'PASSWORD_CHANGE_REQUIRED') { window.location.href = BASE + 'account.html'; throw new Error(data.error); }
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      }
+
+      function setMsg(node, text, ok) {
+        node.textContent = text;
+        node.classList.toggle('ok', !!ok);
+      }
+
+      // ---- Small building blocks ----
+
+      function textInput(value, max) {
+        var i = el('input');
+        i.type = 'text';
+        if (max) i.maxLength = max;
+        i.value = value || '';
+        return i;
+      }
+
+      function numberInput(value) {
+        var i = el('input');
+        i.type = 'number';
+        i.min = '0';
+        i.max = '999';
+        i.step = '1';
+        i.value = value === undefined || value === null ? '' : String(value);
+        return i;
+      }
+
+      function checkbox(checked) {
+        var c = el('input');
+        c.type = 'checkbox';
+        c.checked = !!checked;
+        return c;
+      }
+
+      // A label above a control. `cls` is the column width, such as "c4".
+      function field(label, control, cls, hint) {
+        var l = el('label', 'field ' + (cls || ''));
+        l.appendChild(document.createTextNode(label));
+        l.appendChild(control);
+        if (hint) l.appendChild(el('span', 'hint', hint));
+        return l;
+      }
+
+      function setIcon(node, name) {
+        node.innerHTML = name && window.iconSvg ? window.iconSvg(name) : '';
+      }
+
+      function fillSelect(select, options, blank) {
+        select.textContent = '';
+        if (blank) select.appendChild(new Option(blank, ''));
+        options.forEach(function (o) { select.appendChild(new Option(o.label, o.value)); });
+      }
+
+      function groupSelect(value) {
+        var select = el('select');
+        fillSelect(select, state.catalog.groups.map(function (g) { return { value: g.id, label: g.label }; }), 'No department group');
+        select.value = value || '';
+        return select;
+      }
+
+      // The icon to use for a service or group: a button that opens a grid of every icon.
+      // Returns { node, value(), onChange(fn) }.
+      var openPickers = [];
+      function iconPicker(value, onChange) {
+        var current = value || '';
+        var listener = onChange || function () {};
+        var wrap = el('div', 'picker');
+        var btn = el('button', null);
+        btn.type = 'button';
+        btn.className = 'picker-btn';
+        btn.setAttribute('aria-haspopup', 'true');
+        var preview = el('span', 'icon-preview');
+        var label = el('span');
+        btn.appendChild(preview);
+        btn.appendChild(label);
+        btn.appendChild(el('span', 'caret', '▼'));
+        var pop = el('div', 'icon-pop hidden');
+
+        function show() {
+          setIcon(preview, current);
+          label.textContent = current || 'No icon';
+          Array.prototype.forEach.call(pop.children, function (b) { b.classList.toggle('selected', b.getAttribute('data-icon') === current); });
+        }
+        function choose(name) {
+          current = name;
+          show();
+          close();
+          listener(name);
+        }
+        function close() { pop.classList.add('hidden'); }
+        var none = el('button', 'none', 'None');
+        none.type = 'button';
+        none.setAttribute('data-icon', '');
+        none.title = 'No icon';
+        none.addEventListener('click', function () { choose(''); });
+        pop.appendChild(none);
+        (state.catalog.iconNames || []).forEach(function (name) {
+          var b = el('button');
+          b.type = 'button';
+          b.setAttribute('data-icon', name);
+          b.title = name;
+          b.setAttribute('aria-label', name);
+          setIcon(b, name);
+          b.addEventListener('click', function () { choose(name); });
+          pop.appendChild(b);
+        });
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var opening = pop.classList.contains('hidden');
+          openPickers.forEach(function (p) { p.close(); });
+          if (!opening) return;
+          pop.classList.remove('hidden');
+          pop.classList.remove('align-right');
+          if (pop.getBoundingClientRect().right > window.innerWidth - 8) pop.classList.add('align-right');
+        });
+        pop.addEventListener('click', function (e) { e.stopPropagation(); });
+        wrap.appendChild(btn);
+        wrap.appendChild(pop);
+        show();
+        openPickers.push({ close: close });
+        return { node: wrap, value: function () { return current; }, onChange: function (fn) { listener = fn; } };
+      }
+      document.addEventListener('click', function () { openPickers.forEach(function (p) { p.close(); }); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openPickers.forEach(function (p) { p.close(); }); });
+
+      // A colour swatch to pick from, with its hex value beside it. Empty means no colour.
+      function colorField(value, onChange) {
+        var wrap = el('div', 'color-field');
+        var picker = el('input');
+        picker.type = 'color';
+        picker.value = COLOR_RE.test(value || '') ? value : '#3b5bdb';
+        picker.setAttribute('aria-label', 'Pick a colour');
+        var text = textInput(value || '', 7);
+        text.placeholder = 'None';
+        text.setAttribute('aria-label', 'Colour as a hex value');
+        function sync() { wrap.classList.toggle('is-empty', !text.value.trim()); }
+        picker.addEventListener('input', function () { text.value = picker.value; sync(); if (onChange) onChange(); });
+        text.addEventListener('input', function () {
+          if (COLOR_RE.test(text.value.trim())) picker.value = text.value.trim();
+          sync();
+          if (onChange) onChange();
+        });
+        sync();
+        wrap.appendChild(picker);
+        wrap.appendChild(text);
+        return { node: wrap, value: function () { return text.value.trim(); } };
+      }
+
+      // Keeps a card's Save button and "unsaved" edge in step with its fields.
+      // `read()` returns the card's current values; Save sends only the ones that differ from `original`.
+      function trackCard(card, read, save) {
+        var original = read();
+        function changes() {
+          var now = read();
+          var out = {};
+          Object.keys(now).forEach(function (k) { if (now[k] !== original[k]) out[k] = now[k]; });
+          return out;
+        }
+        function refresh() {
+          var dirty = Object.keys(changes()).length > 0;
+          save.disabled = !dirty;
+          card.classList.toggle('is-dirty', dirty);
+          if (dirty) dirtyCards.add(card); else dirtyCards.delete(card);
+        }
+        card.addEventListener('input', refresh);
+        card.addEventListener('change', refresh);
+        refresh();
+        return {
+          changes: changes,
+          refresh: refresh,
+          saved: function () { original = read(); refresh(); }
+        };
+      }
+
+      // True when it is fine to redraw the lists: nothing is unsaved, or the person agrees to lose it.
+      function confirmDiscard() {
+        return !dirtyCards.size || confirm('Some changes on this page have not been saved. Continue and lose them?');
+      }
+
+      // Redraws the lists from the server. Cards with unsaved changes are never thrown away, so unless
+      // `force` is set nothing is redrawn while one exists; the next tab change picks the new data up.
+      function reload(force) {
+        return api('api/admin/catalog').then(function (c) {
+          state.catalog = c;
+          if (dirtyCards.size && !force) { state.stale = true; return; }
+          state.stale = false;
+          renderAll();
+          if (state.translations && !translationsDirty()) loadTranslations(true);
+        });
+      }
+
+      function renderAll() {
+        dirtyCards.clear();
+        fillSelect($('svc-new-group'), state.catalog.groups.map(function (g) { return { value: g.id, label: g.label }; }), 'No department group');
+        renderServices();
+        renderGroups();
+        renderLanguages();
+        state.saved = '';
+      }
+
+      // After a save the lists are drawn again, so the "Saved." note is put back on the card that was saved.
+      function flashSaved(id, msg) {
+        if (state.saved === id) setMsg(msg, 'Saved.', true);
+      }
+
+      // ---- Services ----
+
+      function serviceCard(s) {
+        var card = el('article', 'item-card' + (s.active ? '' : ' is-off'));
+        var preview = el('span', 'icon-preview');
+        setIcon(preview, s.icon);
+        var icon = iconPicker(s.icon, function (name) { setIcon(preview, name); card.dispatchEvent(new Event('change', { bubbles: true })); });
+        var name = textInput(s.name, 100);
+        var description = textInput(s.description, 255);
+        var group = groupSelect(s.groupId);
+        var color = colorField(s.color, function () { card.dispatchEvent(new Event('change', { bubbles: true })); });
+        var active = checkbox(s.active);
+        var asks = checkbox(s.asksAppointment);
+        var pinned = checkbox(s.pinned);
+        var save = el('button', 'primary', 'Save');
+        save.type = 'button';
+        var remove = el('button', 'danger', 'Delete');
+        remove.type = 'button';
+        var msg = el('p', 'row-msg');
+
+        var head = el('div', 'item-head');
+        head.appendChild(preview);
+        head.appendChild(el('span', 'item-code', s.code));
+        if (!s.active) head.appendChild(el('span', 'pill', 'Off'));
+        if (s.asksAppointment) head.appendChild(el('span', 'pill', 'Appointments'));
+        if (s.pinned) head.appendChild(el('span', 'pill', 'Pinned'));
+        var notes = [];
+        if (s.hasTickets) notes.push('Has customers on record');
+        if (s.openCount) notes.push(s.openCount + ' waiting or being helped now');
+        if (notes.length) head.appendChild(el('span', 'item-note', notes.join(' · ')));
+        head.appendChild(el('span', 'spacer'));
+        var sw = el('label', 'switch');
+        sw.appendChild(active);
+        sw.appendChild(document.createTextNode('On the kiosk'));
+        head.appendChild(sw);
+
+        var fields = el('div', 'fields');
+        fields.appendChild(field('Name', name, 'c5'));
+        fields.appendChild(field('Description', description, 'c7'));
+        fields.appendChild(field('Icon', icon.node, 'c4'));
+        fields.appendChild(field('Department group', group, 'c4'));
+        fields.appendChild(field('Monitor colour', color.node, 'c4', 'When not in a group'));
+        var options = el('div', 'option-row');
+        [[asks, 'Asks who they are seeing and the appointment time', 'The kiosk and the walk-in form ask the two questions.'],
+          [pinned, 'Always in staff watched queues', 'Staff cannot unwatch it, and it sits first in their list.']].forEach(function (o) {
+          var label = el('label', 'switch');
+          label.appendChild(o[0]);
+          var text = el('span', null, o[1]);
+          text.appendChild(el('small', null, o[2]));
+          label.appendChild(text);
+          options.appendChild(label);
+        });
+        fields.appendChild(options);
+
+        var foot = el('div', 'item-foot');
+        foot.appendChild(msg);
+        foot.appendChild(remove);
+        foot.appendChild(save);
+        card.appendChild(head);
+        card.appendChild(fields);
+        card.appendChild(foot);
+
+        flashSaved('svc:' + s.code, msg);
+        var track = trackCard(card, function () {
+          return {
+            name: name.value.trim(), description: description.value.trim(), icon: icon.value(),
+            groupId: group.value, color: color.value(), active: active.checked, asksAppointment: asks.checked, pinned: pinned.checked
+          };
+        }, save);
+
+        save.addEventListener('click', function () {
+          var body = track.changes();
+          if (body.active === false) {
+            var warning = '';
+            if (s.openCount) warning += s.openCount + ' customer(s) are waiting or being helped for ' + s.code + ' today. If you turn it off, they disappear from the queue screens. ';
+            if (s.pinned) warning += s.code + ' is pinned in every staff member\'s watched queues, and that goes with it. ';
+            if (s.asksAppointment) warning += 'Customers can no longer check in for appointments with it. ';
+            if (warning && !confirm(warning + 'Turn it off anyway?')) return;
+          }
+          save.disabled = true;
+          setMsg(msg, '');
+          api('api/admin/services/' + encodeURIComponent(s.code), { method: 'PATCH', body: JSON.stringify(body) })
+            .then(function () { track.saved(); setMsg(msg, 'Saved.', true); state.saved = 'svc:' + s.code; return reload(); })
+            .catch(function (err) { setMsg(msg, err.message); track.refresh(); });
+        });
+        remove.addEventListener('click', function () {
+          var extra = s.asksAppointment || s.pinned ? ' It is set up for appointments or pinned in staff queues, and that goes with it.' : '';
+          if (!confirm('Delete ' + s.code + ' (' + s.name + ')? This cannot be undone.' + extra)) return;
+          api('api/admin/services/' + encodeURIComponent(s.code), { method: 'DELETE' })
+            .then(function () { dirtyCards.delete(card); card.remove(); return reload(); })
+            .catch(function (err) { setMsg(msg, err.message); });
+        });
+        return card;
+      }
+
+      function renderList(list, items, build, emptyText) {
+        list.textContent = '';
+        if (!items.length) { list.appendChild(el('div', 'empty', emptyText)); return; }
+        items.forEach(function (item) { list.appendChild(build(item)); });
+      }
+
+      function renderServices() {
+        renderList($('svc-list'), state.catalog.services, serviceCard, 'No services yet. Add one above.');
+        buildBoard();
+      }
+
+      // ---- Kiosk layout board ----
+      // board.rows is the layout being worked on: a list of rows, each a list of service codes in order. It
+      // starts as the saved layout. Moving a tile only changes board.rows; Save layout sends it to the server.
+      var board = { rows: [], saved: '', services: {} };
+
+      function boardSnapshot() { return JSON.stringify(board.rows.filter(function (r) { return r.length; })); }
+
+      // Builds the board from the saved services: those turned on, grouped by their row, in the order the server
+      // lists them. A service with no row yet goes on a last row of its own.
+      function buildBoard() {
+        board.services = {};
+        var byRow = {};
+        var loose = [];
+        state.catalog.services.filter(function (s) { return s.active; }).forEach(function (s) {
+          board.services[s.code] = s;
+          if (s.row >= 1) (byRow[s.row] = byRow[s.row] || []).push(s.code); else loose.push(s.code);
+        });
+        board.rows = Object.keys(byRow).map(Number).sort(function (a, b) { return a - b; }).map(function (n) { return byRow[n]; });
+        if (loose.length) board.rows.push(loose);
+        board.saved = boardSnapshot();
+        renderBoard();
+        if (state.flashLayout) { setMsg($('layout-msg'), 'Layout saved. The kiosk has it now.', true); state.flashLayout = false; }
+      }
+
+      function boardChip(code) {
+        var s = board.services[code];
+        var chip = el('button', 'tile-chip');
+        chip.type = 'button';
+        chip.setAttribute('data-code', code);
+        chip.title = s.name;
+        chip.setAttribute('aria-label', code + ', ' + s.name + '. Use the arrow keys to move it.');
+        if (s.icon) {
+          var ic = el('span', 'icon-preview');
+          setIcon(ic, s.icon);
+          chip.appendChild(ic);
+        }
+        chip.appendChild(el('span', null, code));
+        chip.appendChild(el('span', 'nm', s.name));
+        chip.addEventListener('pointerdown', function (e) { startDrag(e, chip); });
+        chip.addEventListener('keydown', function (e) { moveByKey(e, code); });
+        return chip;
+      }
+
+      function renderBoard() {
+        var host = $('svc-layout');
+        host.textContent = '';
+        board.rows.forEach(function (codes, r) {
+          var line = el('div', 'board-row' + (codes.length > MAX_TILES ? ' is-long' : ''));
+          line.appendChild(el('span', 'row-label', 'Row ' + (r + 1)));
+          var zone = el('div', 'board-zone');
+          zone.setAttribute('data-row', String(r));
+          if (!codes.length) zone.appendChild(el('span', 'zone-empty', 'Empty. Drag a service here, or remove the row.'));
+          codes.forEach(function (code) { zone.appendChild(boardChip(code)); });
+          line.appendChild(zone);
+          var tools = el('div', 'board-tools');
+          var remove = el('button', null, 'Remove row');
+          remove.type = 'button';
+          remove.disabled = codes.length > 0;
+          remove.title = codes.length ? 'Move its services to another row first' : 'Remove this empty row';
+          remove.addEventListener('click', function () { board.rows.splice(r, 1); renderBoard(); });
+          tools.appendChild(remove);
+          line.appendChild(tools);
+          host.appendChild(line);
+        });
+        if (!board.rows.length) host.appendChild(el('div', 'empty', 'There are no services on the kiosk.'));
+        updateBoardState();
+      }
+
+      // The Save and Discard buttons, the warnings, and whether the page counts this panel as unsaved.
+      function updateBoardState() {
+        var box = $('svc-layout-box');
+        var dirty = boardSnapshot() !== board.saved;
+        $('layout-save').disabled = !dirty;
+        $('layout-discard').disabled = !dirty;
+        box.classList.toggle('is-dirty', dirty);
+        if (dirty) dirtyCards.add(box); else dirtyCards.delete(box);
+        var wide = [];
+        board.rows.forEach(function (codes, r) { if (codes.length > MAX_TILES) wide.push(r + 1); });
+        var text = '';
+        if (wide.length) text = 'Row ' + wide.join(', ') + (wide.length === 1 ? ' has' : ' have') + ' more than ' + MAX_TILES + ' services. They may wrap onto a second line on a smaller kiosk screen. ';
+        if (board.rows.some(function (r) { return !r.length; })) text += 'Empty rows are left out when you save. ';
+        var off = state.catalog.services.filter(function (s) { return !s.active; }).map(function (s) { return s.code; });
+        if (off.length) text += 'Turned off, so not shown: ' + off.join(', ') + '.';
+        $('svc-layout-note').textContent = text.trim();
+        $('svc-layout-note').classList.toggle('warn', wide.length > 0);
+        if (dirty) setMsg($('layout-msg'), '');
+      }
+
+      // Takes a service out of wherever it is and puts it at `index` in row `toRow` (or on a new row last when
+      // toRow is 'new'). `index` counts the row without the service in it.
+      function moveTile(code, toRow, index) {
+        board.rows.forEach(function (codes) {
+          var at = codes.indexOf(code);
+          if (at >= 0) codes.splice(at, 1);
+        });
+        if (toRow === 'new') board.rows.push([code]);
+        else board.rows[toRow].splice(Math.max(0, Math.min(index, board.rows[toRow].length)), 0, code);
+        renderBoard();
+      }
+
+      // Arrow keys: left and right along the row, up and down to the next row.
+      function moveByKey(e, code) {
+        var keys = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] };
+        var step = keys[e.key];
+        if (!step) return;
+        var row = -1;
+        var at = -1;
+        board.rows.forEach(function (codes, r) { if (codes.indexOf(code) >= 0) { row = r; at = codes.indexOf(code); } });
+        var toRow = row + step[0];
+        if (row < 0 || toRow < 0 || toRow >= board.rows.length) { e.preventDefault(); return; }
+        var length = board.rows[toRow].length - (toRow === row ? 1 : 0);
+        var index = toRow === row ? at + step[1] : Math.min(at, length);
+        if (index < 0 || index > length) { e.preventDefault(); return; }
+        e.preventDefault();
+        moveTile(code, toRow, index);
+        var moved = $('svc-layout').querySelector('[data-code="' + code + '"]');
+        if (moved) moved.focus();
+      }
+
+      // Where a dragged tile would land if let go at this point: a row and a place in it, or a new row.
+      function dropTarget(x, y, code) {
+        var under = document.elementFromPoint(x, y);
+        if (!under) return null;
+        if (under.closest('#layout-add-row')) return { row: 'new' };
+        var zone = under.closest('.board-zone');
+        if (!zone) {
+          var line = under.closest('.board-row');
+          zone = line && line.querySelector('.board-zone');
+        }
+        if (!zone) return null;
+        var chips = Array.prototype.filter.call(zone.querySelectorAll('.tile-chip'), function (c) { return c.getAttribute('data-code') !== code; });
+        var index = chips.length;
+        for (var i = 0; i < chips.length; i++) {
+          var b = chips[i].getBoundingClientRect();
+          if (y < b.top || (y <= b.bottom && x < b.left + b.width / 2)) { index = i; break; }
+        }
+        return { row: Number(zone.getAttribute('data-row')), index: index, zone: zone, before: chips[index] || null };
+      }
+
+      // Dragging with the pointer, so a mouse, a pen and a finger all work. A tile follows the pointer once it has
+      // moved a few pixels, and a bar shows where it would land.
+      function startDrag(e, chip) {
+        if (e.button !== undefined && e.button !== 0) return;
+        var code = chip.getAttribute('data-code');
+        var box = chip.getBoundingClientRect();
+        var offsetX = e.clientX - box.left;
+        var offsetY = e.clientY - box.top;
+        var startX = e.clientX;
+        var startY = e.clientY;
+        var ghost = null;
+        var marker = null;
+        var lastZone = null;
+
+        function clearHints() {
+          if (marker) { marker.remove(); marker = null; }
+          if (lastZone) { lastZone.classList.remove('is-over'); lastZone = null; }
+          $('layout-add-row').classList.remove('is-over');
+        }
+        function move(ev) {
+          if (!ghost) {
+            if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 6) return;
+            ghost = chip.cloneNode(true);
+            ghost.classList.add('drag-ghost');
+            ghost.style.width = box.width + 'px';
+            document.body.appendChild(ghost);
+            chip.classList.add('is-dragging');
+          }
+          ev.preventDefault();
+          ghost.style.left = (ev.clientX - offsetX) + 'px';
+          ghost.style.top = (ev.clientY - offsetY) + 'px';
+          // Near the top or bottom of the window, scroll so a far row can be reached.
+          if (ev.clientY < 70) window.scrollBy(0, -14);
+          else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 14);
+          clearHints();
+          var target = dropTarget(ev.clientX, ev.clientY, code);
+          if (!target) return;
+          if (target.row === 'new') { $('layout-add-row').classList.add('is-over'); return; }
+          lastZone = target.zone;
+          lastZone.classList.add('is-over');
+          marker = el('span', 'drop-marker');
+          var empty = lastZone.querySelector('.zone-empty');
+          if (empty) empty.remove();
+          lastZone.insertBefore(marker, target.before);
+        }
+        function finish(ev, drop) {
+          document.removeEventListener('pointermove', move);
+          document.removeEventListener('pointerup', up);
+          document.removeEventListener('pointercancel', cancel);
+          var target = ghost && drop ? dropTarget(ev.clientX, ev.clientY, code) : null;
+          clearHints();
+          if (ghost) { ghost.remove(); chip.classList.remove('is-dragging'); }
+          if (target) moveTile(code, target.row, target.index);
+          else if (ghost) renderBoard();
+        }
+        function up(ev) { finish(ev, true); }
+        function cancel(ev) { finish(ev, false); }
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', up);
+        document.addEventListener('pointercancel', cancel);
+      }
+
+      function saveBoard() {
+        var rows = board.rows.filter(function (r) { return r.length; });
+        $('layout-save').disabled = true;
+        setMsg($('layout-msg'), '');
+        api('api/admin/layout', { method: 'PUT', body: JSON.stringify({ rows: rows }) })
+          .then(function () {
+            board.rows = rows;
+            board.saved = boardSnapshot();
+            state.flashLayout = true;
+            updateBoardState();
+            return reload();
+          })
+          .then(function () { if (state.flashLayout) { renderBoard(); setMsg($('layout-msg'), 'Layout saved. The kiosk has it now.', true); state.flashLayout = false; } })
+          .catch(function (err) { setMsg($('layout-msg'), err.message); updateBoardState(); });
+      }
+
+      // ---- Department groups ----
+
+      function groupCard(g) {
+        var card = el('article', 'item-card');
+        var preview = el('span', 'icon-preview');
+        setIcon(preview, g.icon);
+        var label = textInput(g.label, 100);
+        var icon = iconPicker(g.icon, function (name) { setIcon(preview, name); card.dispatchEvent(new Event('change', { bubbles: true })); });
+        var color = colorField(g.color, function () { card.dispatchEvent(new Event('change', { bubbles: true })); });
+        var order = numberInput(g.sortOrder);
+        var save = el('button', 'primary', 'Save');
+        save.type = 'button';
+        var remove = el('button', 'danger', 'Delete');
+        remove.type = 'button';
+        var msg = el('p', 'row-msg');
+        var count = g.codes.length;
+
+        var head = el('div', 'item-head');
+        head.appendChild(preview);
+        head.appendChild(el('span', 'item-code', g.id));
+        head.appendChild(el('span', 'item-note', count + (count === 1 ? ' service' : ' services') + (count ? ': ' + g.codes.join(', ') : '')));
+
+        var fields = el('div', 'fields');
+        fields.appendChild(field('Name', label, 'c5'));
+        fields.appendChild(field('Icon', icon.node, 'c3'));
+        fields.appendChild(field('Colour', color.node, 'c3'));
+        fields.appendChild(field('List order', order, 'c2', 'In Settings'));
+
+        var foot = el('div', 'item-foot');
+        foot.appendChild(msg);
+        foot.appendChild(remove);
+        foot.appendChild(save);
+        card.appendChild(head);
+        card.appendChild(fields);
+        card.appendChild(foot);
+
+        flashSaved('grp:' + g.id, msg);
+        var track = trackCard(card, function () {
+          return { label: label.value.trim(), icon: icon.value(), color: color.value(), sortOrder: order.value.trim() };
+        }, save);
+
+        save.addEventListener('click', function () {
+          save.disabled = true;
+          setMsg(msg, '');
+          api('api/admin/groups/' + encodeURIComponent(g.id), { method: 'PATCH', body: JSON.stringify(track.changes()) })
+            .then(function () { track.saved(); setMsg(msg, 'Saved.', true); state.saved = 'grp:' + g.id; return reload(); })
+            .catch(function (err) { setMsg(msg, err.message); track.refresh(); });
+        });
+        remove.addEventListener('click', function () {
+          if (!confirm('Delete the department group "' + g.label + '"?')) return;
+          api('api/admin/groups/' + encodeURIComponent(g.id), { method: 'DELETE' })
+            .then(function () { dirtyCards.delete(card); card.remove(); return reload(); })
+            .catch(function (err) { setMsg(msg, err.message); });
+        });
+        return card;
+      }
+
+      function renderGroups() {
+        renderList($('grp-list'), state.catalog.groups, groupCard, 'No department groups yet. Add one above.');
+      }
+
+      // ---- Languages ----
+
+      function languageCard(l) {
+        var card = el('article', 'item-card' + (l.enabled ? '' : ' is-off'));
+        var name = textInput(l.name, 50);
+        var enabled = checkbox(l.enabled);
+        var isEnglish = l.code === 'en';
+        if (isEnglish) enabled.disabled = true;
+        var save = el('button', 'primary', 'Save');
+        save.type = 'button';
+        var msg = el('p', 'row-msg');
+
+        var head = el('div', 'item-head');
+        head.appendChild(el('span', 'item-code', l.code));
+        if (isEnglish) head.appendChild(el('span', 'item-note', 'Always on'));
+        head.appendChild(el('span', 'spacer'));
+        var sw = el('label', 'switch');
+        sw.appendChild(enabled);
+        sw.appendChild(document.createTextNode('On the kiosk'));
+        head.appendChild(sw);
+
+        var fields = el('div', 'fields');
+        fields.appendChild(field('Name, as people in that language write it', name, 'c6'));
+        var foot = el('div', 'item-foot');
+        foot.appendChild(msg);
+        if (!isEnglish) {
+          var remove = el('button', 'danger', 'Delete');
+          remove.type = 'button';
+          remove.title = 'Delete this language and its translations. To keep them, turn it off instead.';
+          remove.addEventListener('click', function () {
+            if (!confirm('Delete ' + l.name + ' and every translation in it? This cannot be undone. To keep the translations, turn the language off instead.')) return;
+            api('api/admin/languages/' + encodeURIComponent(l.code), { method: 'DELETE' })
+              .then(function () { dirtyCards.delete(card); if (state.trLang === l.code) { state.trLang = ''; state.translations = null; } card.remove(); return reload(); })
+              .catch(function (err) { setMsg(msg, err.message); });
+          });
+          foot.appendChild(remove);
+        }
+        foot.appendChild(save);
+        card.appendChild(head);
+        card.appendChild(fields);
+        card.appendChild(foot);
+
+        flashSaved('lang:' + l.code, msg);
+        var track = trackCard(card, function () { return { name: name.value.trim(), enabled: enabled.checked }; }, save);
+        save.addEventListener('click', function () {
+          save.disabled = true;
+          setMsg(msg, '');
+          api('api/admin/languages/' + encodeURIComponent(l.code), { method: 'PATCH', body: JSON.stringify(track.changes()) })
+            .then(function () { track.saved(); setMsg(msg, 'Saved.', true); state.saved = 'lang:' + l.code; return reload(); })
+            .catch(function (err) { setMsg(msg, err.message); track.refresh(); });
+        });
+        return card;
+      }
+
+      function renderLanguages() {
+        renderList($('lang-list'), state.catalog.languages, languageCard, 'No languages.');
+        var select = $('tr-lang');
+        var others = state.catalog.languages.filter(function (l) { return l.code !== 'en'; });
+        var keep = state.trLang;
+        fillSelect(select, others.map(function (l) { return { value: l.code, label: l.name + ' (' + l.code + ')' }; }));
+        if (keep && others.some(function (l) { return l.code === keep; })) select.value = keep;
+        state.trLang = select.value;
+        $('tr-save').disabled = !select.value;
+      }
+
+      // ---- Translations ----
+
+      function trInputs() { return $('tr-body').querySelectorAll('[data-key]'); }
+
+      function translationsDirty() {
+        if (!state.translations) return false;
+        return Array.prototype.some.call(trInputs(), function (i) {
+          return i.value.trim() !== (state.translations.original[i.getAttribute('data-key')] || '').trim();
+        });
+      }
+
+      // `quiet` redraws without the "Loading" flash, for a reload after saving.
+      function loadTranslations(quiet) {
+        var lang = $('tr-lang').value;
+        state.trLang = lang;
+        var body = $('tr-body');
+        $('tr-head').classList.toggle('hidden', !lang);
+        if (!lang) { state.translations = null; body.textContent = 'Add a language first.'; $('tr-count').textContent = ''; return; }
+        if (!quiet) body.textContent = 'Loading…';
+        var token = ++state.trToken;
+        api('api/admin/translations?lang=' + encodeURIComponent(lang))
+          .then(function (data) {
+            if (token !== state.trToken) return; // a newer request has replaced this one
+            state.translations = { lang: data.lang, items: data.items, original: {} };
+            renderTranslations();
+          })
+          .catch(function (err) { if (token === state.trToken) body.textContent = err.message; });
+      }
+
+      function renderTranslations() {
+        var t = state.translations;
+        var body = $('tr-body');
+        body.textContent = '';
+        var section = null;
+        t.items.forEach(function (item) {
+          if (item.section !== section) {
+            section = item.section;
+            body.appendChild(el('div', 'section-title', section));
+          }
+          t.original[item.key] = item.value;
+          var row = el('div', 'translate-item');
+          row.setAttribute('data-section', item.section);
+          row.appendChild(el('span', 't-label', item.label));
+          row.appendChild(el('span', 'english', item.english || ''));
+          // A translation is often longer than the English, so a long one gets room to wrap.
+          var long = Math.max((item.english || '').length, item.value.length) > 50;
+          var input = long ? el('textarea') : el('input');
+          if (long) input.rows = 2; else input.type = 'text';
+          input.value = item.value;
+          input.placeholder = item.english || '';
+          input.maxLength = 500;
+          input.setAttribute('data-key', item.key);
+          input.setAttribute('aria-label', 'Translation of ' + item.label);
+          row.appendChild(input);
+          body.appendChild(row);
+        });
+        applyTodoFilter();
+        updateTranslationCount();
+      }
+
+      // Marks which rows are already translated, so "only items still to translate" can hide them. The marks are
+      // taken when the filter is switched on or the list is drawn, not while typing, so a row does not vanish under the cursor.
+      function applyTodoFilter() {
+        var body = $('tr-body');
+        var rows = body.querySelectorAll('.translate-item');
+        var sections = {};
+        Array.prototype.forEach.call(rows, function (row) {
+          var input = row.querySelector('[data-key]');
+          var done = input.value.trim() !== '';
+          row.classList.toggle('is-done', done);
+          var s = row.getAttribute('data-section');
+          if (!done) sections[s] = true;
+        });
+        Array.prototype.forEach.call(body.querySelectorAll('.section-title'), function (title) {
+          title.classList.toggle('is-done', !sections[title.textContent]);
+        });
+        body.classList.toggle('only-todo', $('tr-todo').checked);
+      }
+
+      function updateTranslationCount() {
+        if (!state.translations) return;
+        var inputs = trInputs();
+        var done = Array.prototype.filter.call(inputs, function (i) { return i.value.trim() !== ''; }).length;
+        $('tr-count').textContent = done + ' of ' + inputs.length + ' translated';
+        Array.prototype.forEach.call(inputs, function (i) {
+          var changed = i.value.trim() !== (state.translations.original[i.getAttribute('data-key')] || '').trim();
+          i.closest('.translate-item').classList.toggle('is-changed', changed);
+        });
+      }
+
+      function saveTranslations() {
+        if (!state.translations) return;
+        var values = {};
+        Array.prototype.forEach.call(trInputs(), function (i) {
+          var key = i.getAttribute('data-key');
+          var now = i.value.trim();
+          if (now !== (state.translations.original[key] || '').trim()) values[key] = now;
+        });
+        var count = Object.keys(values).length;
+        if (!count) { setMsg($('tr-msg'), 'Nothing to save.', true); return; }
+        $('tr-save').disabled = true;
+        setMsg($('tr-msg'), '');
+        api('api/admin/translations', { method: 'PUT', body: JSON.stringify({ lang: state.translations.lang, values: values }) })
+          .then(function () {
+            setMsg($('tr-msg'), 'Saved ' + count + ' change' + (count === 1 ? '' : 's') + '.', true);
+            loadTranslations(true);
+          })
+          .catch(function (err) { setMsg($('tr-msg'), err.message); })
+          .then(function () { $('tr-save').disabled = !$('tr-lang').value; });
+      }
+
+      // ---- Adding ----
+
+      var newSvcIcon, newSvcColor, newGrpIcon, newGrpColor;
+
+      function buildAddFields() {
+        newSvcIcon = iconPicker('');
+        newSvcColor = colorField('');
+        newGrpIcon = iconPicker('');
+        newGrpColor = colorField('');
+        $('svc-new-icon-slot').textContent = '';
+        $('svc-new-color-slot').textContent = '';
+        $('grp-new-icon-slot').textContent = '';
+        $('grp-new-color-slot').textContent = '';
+        $('svc-new-icon-slot').appendChild(newSvcIcon.node);
+        $('svc-new-color-slot').appendChild(newSvcColor.node);
+        $('grp-new-icon-slot').appendChild(newGrpIcon.node);
+        $('grp-new-color-slot').appendChild(newGrpColor.node);
+      }
+
+      function addService() {
+        if (!confirmDiscard()) return;
+        var body = {
+          code: $('svc-new-code').value.trim(),
+          name: $('svc-new-name').value.trim(),
+          description: $('svc-new-description').value.trim(),
+          icon: newSvcIcon.value(),
+          groupId: $('svc-new-group').value,
+          color: newSvcColor.value(),
+          asksAppointment: $('svc-new-appt').checked,
+          pinned: $('svc-new-pinned').checked
+        };
+        var msg = $('svc-add-msg');
+        setMsg(msg, '');
+        api('api/admin/services', { method: 'POST', body: JSON.stringify(body) })
+          .then(function () {
+            setMsg(msg, 'Added ' + body.code.toUpperCase() + '. It shows on the kiosk now.', true);
+            ['svc-new-code', 'svc-new-name', 'svc-new-description'].forEach(function (id) { $(id).value = ''; });
+            $('svc-new-appt').checked = false;
+            $('svc-new-pinned').checked = false;
+            return reload(true).then(buildAddFields);
+          })
+          .catch(function (err) { setMsg(msg, err.message); });
+      }
+
+      function addGroup() {
+        if (!confirmDiscard()) return;
+        var body = {
+          id: $('grp-new-id').value.trim().toLowerCase(),
+          label: $('grp-new-label').value.trim(),
+          icon: newGrpIcon.value(),
+          color: newGrpColor.value()
+        };
+        var msg = $('grp-add-msg');
+        setMsg(msg, '');
+        api('api/admin/groups', { method: 'POST', body: JSON.stringify(body) })
+          .then(function () {
+            setMsg(msg, 'Added ' + body.label + '.', true);
+            ['grp-new-id', 'grp-new-label'].forEach(function (id) { $(id).value = ''; });
+            return reload(true).then(buildAddFields);
+          })
+          .catch(function (err) { setMsg(msg, err.message); });
+      }
+
+      function addLanguage() {
+        if (!confirmDiscard()) return;
+        var body = { code: $('lang-new-code').value.trim().toLowerCase(), name: $('lang-new-name').value.trim() };
+        var msg = $('lang-add-msg');
+        setMsg(msg, '');
+        api('api/admin/languages', { method: 'POST', body: JSON.stringify(body) })
+          .then(function () {
+            setMsg(msg, 'Added ' + body.name + '. Now translate it on the Translations tab.', true);
+            $('lang-new-code').value = '';
+            $('lang-new-name').value = '';
+            state.trLang = body.code;
+            return reload(true);
+          })
+          .catch(function (err) { setMsg(msg, err.message); });
+      }
+
+      // ---- Loading and tabs ----
+
+      function showTab(tab) {
+        TABS.forEach(function (t) { $('panel-' + t).classList.toggle('hidden', t !== tab); });
+        document.querySelectorAll('.subtab-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+        // A redraw held back by unsaved changes happens once they are saved or lost.
+        if (state.stale && !dirtyCards.size) reload().catch(function () {});
+        if (tab === 'translations' && !state.translations) loadTranslations();
+      }
+
+      document.querySelectorAll('.subtab-btn').forEach(function (b) {
+        b.addEventListener('click', function () { showTab(b.dataset.tab); });
+      });
+      $('svc-add').addEventListener('click', addService);
+      $('layout-save').addEventListener('click', saveBoard);
+      $('layout-discard').addEventListener('click', function () { setMsg($('layout-msg'), ''); buildBoard(); });
+      $('layout-add-row').addEventListener('click', function () { board.rows.push([]); renderBoard(); });
+      $('grp-add').addEventListener('click', addGroup);
+      $('lang-add').addEventListener('click', addLanguage);
+      $('tr-lang').addEventListener('change', function () {
+        if (translationsDirty() && !confirm('Some translations have not been saved. Switch language and lose them?')) {
+          $('tr-lang').value = state.trLang;
+          return;
+        }
+        state.translations = null;
+        loadTranslations();
+      });
+      $('tr-todo').addEventListener('change', applyTodoFilter);
+      $('tr-body').addEventListener('input', updateTranslationCount);
+      $('tr-save').addEventListener('click', saveTranslations);
+      window.addEventListener('beforeunload', function (e) {
+        if (dirtyCards.size || translationsDirty()) { e.preventDefault(); e.returnValue = ''; }
+      });
+      $('signout').addEventListener('click', function () {
+        fetch(BASE + 'api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+          .catch(function () {})
+          .then(function () { window.location.href = BASE + 'index.html'; });
+      });
+
+      function showDenied(title, text) {
+        $('denied-title').textContent = title;
+        $('denied-text').textContent = text;
+        $('denied').classList.remove('hidden');
+      }
+
+      // Settle who is signed in. Only admins may change services and languages.
+      (window.appSettingsReady || Promise.resolve()).then(function () {
+        return api('api/auth/me');
+      }).then(function (user) {
+        $('signed-in').textContent = user.displayName + ' · ' + ROLE_LABEL[user.role];
+        var manager = user.role === 'manager' || user.role === 'admin';
+        $('manage-link').classList.toggle('hidden', !manager);
+        $('manage-tabs').classList.toggle('hidden', !manager);
+        if (user.role !== 'admin') {
+          $('nav-catalog').classList.add('hidden');
+          showDenied('Admins only', 'Services and languages are changed by admins.');
+          return;
+        }
+        ['nav-settings', 'nav-health', 'nav-catalog'].forEach(function (id) { $(id).classList.remove('hidden'); });
+        $('app').classList.remove('hidden');
+        $('tabs').classList.remove('hidden');
+        return api('api/admin/catalog').then(function (c) {
+          state.catalog = c;
+          buildAddFields();
+          renderAll();
+          var requested = new URLSearchParams(location.search).get('tab');
+          showTab(TABS.indexOf(requested) >= 0 ? requested : 'services');
+        });
+      }).catch(function (err) {
+        if (err && /Sign in required/.test(err.message)) return;
+        $('app').classList.add('hidden');
+        $('tabs').classList.add('hidden');
+        showDenied('Could not load', err.message);
+      });
+    })();
+  </script>
+</body>
+</html>

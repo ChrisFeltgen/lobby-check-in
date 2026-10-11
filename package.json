@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/auth.test.js tests/availability.test.js tests/reports.test.js tests/schema.test.js tests/settings.test.js tests/http.test.js"
+    "test": "node --test tests/auth.test.js tests/availability.test.js tests/reports.test.js tests/schema.test.js tests/settings.test.js tests/http.test.js tests/catalog.test.js tests/privacy.test.js"
   },
   "license": "MIT",
   "dependencies": {

@@ -150,7 +150,7 @@
        tapping it shows the full-screen unavailable message rather than doing nothing. */
     .tile.unavailable { opacity: 0.6; border-top-color: var(--k-muted); }
     .tile.unavailable:active { transform: scale(0.97); border-color: #f0c572; box-shadow: 0 0 0 3px rgba(240, 197, 114, 0.35); }
-    /* Forces the 4-3-3 arrangement: a full-width break after the 4th and 7th cards. */
+    /* Starts a new row: renderServices puts one between services on different rows. */
     .tiles .row-break { flex-basis: 100%; height: 0; }
 
     /* Name, host and time entry */
@@ -293,6 +293,22 @@
     /* Transitions: steps fade and slide in, service cards appear in sequence. */
     @keyframes stepIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
     @keyframes tileIn { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+    /* Shown over everything while the kiosk cannot reach the server. Both languages, because nobody can pick one. */
+    .offline { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 40px; text-align: center; background: var(--k-bg); color: var(--k-text); }
+    .offline.hidden { display: none; }
+    .offline-card { max-width: 900px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .offline-icon { width: clamp(90px, 14vmin, 140px); height: clamp(90px, 14vmin, 140px); border-radius: 50%; background: var(--k-icon-bg, rgba(15, 124, 140, 0.12)); color: var(--k-accent); display: flex; align-items: center; justify-content: center; }
+    .offline-icon svg { width: 55%; height: 55%; }
+    .offline h2 { margin: 6px 0 0; font-size: clamp(36px, 6vmin, 64px); font-weight: 700; color: var(--k-accent); }
+    .offline p { margin: 0; font-size: clamp(24px, 3.4vmin, 36px); line-height: 1.35; }
+    .offline .offline-line { display: block; white-space: nowrap; }
+    .offline .offline-es { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--k-border); width: 100%; }
+    .offline .offline-es h2 { font-size: clamp(30px, 4.8vmin, 50px); margin-top: 0; }
+    .offline .offline-retry { margin-top: 22px; font-size: clamp(18px, 2.4vmin, 24px); color: var(--k-muted); }
+    .offline .offline-retry::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 10px; border-radius: 50%; background: var(--k-accent); animation: offlinePulse 1.4s ease-in-out infinite; }
+    @keyframes offlinePulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .offline .offline-retry::before { animation: none; } }
+
     /* 'backwards' fill only applies before the animation starts, so the press effect on cards still works. */
     .step-enter { animation: stepIn 0.4s ease-out backwards; }
     .tile-enter { animation: tileIn 0.45s ease-out backwards; }
@@ -317,12 +333,9 @@
     <section id="step-welcome" class="welcome">
       <div class="welcome-card">
         <h2 class="welcome-title">Welcome - Please Check In Here</h2>
-        <p class="welcome-title-es">Bienvenido - Regístrese aquí</p>
+        <div id="welcome-others"></div>
         <p class="welcome-sub">Select a Language:</p>
-        <div class="lang-buttons">
-          <button class="lang-btn" type="button" data-lang="en">English</button>
-          <button class="lang-btn" type="button" data-lang="es">Español</button>
-        </div>
+        <div class="lang-buttons" id="lang-buttons"></div>
       </div>
     </section>
 
@@ -403,12 +416,25 @@
     </section>
   </main>
 
+  <div id="offline" class="offline hidden" role="alert" aria-live="assertive">
+    <div class="offline-card">
+      <div class="offline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2-1.5"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 10.4 4.1"/><path d="m2 2 20 20"/></svg></div>
+      <h2>Kiosk unavailable</h2>
+      <p>Sorry, check-in is not working right now.<span class="offline-line">Please see a staff member for help.</span></p>
+      <div class="offline-es">
+        <h2>Quiosco no disponible</h2>
+        <p>Lo sentimos, el registro no funciona en este momento.<span class="offline-line">Por favor, pida ayuda al personal.</span></p>
+      </div>
+      <p class="offline-retry">Trying to reconnect&hellip;</p>
+    </div>
+  </div>
+
   <script src="socket.io/socket.io.js"></script>
   <script src="app-settings.js"></script>
+  <script src="icons.js"></script>
   <script>
     (function () {
       var BASE = location.pathname.replace(/[^/]*$/, '');
-      var APPOINTMENT_CODE = 'AC';
       var ROWS = [
         ['Q','W','E','R','T','Y','U','I','O','P'],
         ['A','S','D','F','G','H','J','K','L'],
@@ -436,127 +462,14 @@
       var busy = false;
       var lastAhead = 0;
 
-      // All kiosk text. English is the default; anything missing from Spanish falls back to English.
-      var T = {
-        en: {
-          brand: 'Check In',
-          hero_title: 'What can we help you with today?',
-          hero_sub: 'Please select the service you need.',
-          step_name: 'Your name', step_appt: 'Appointment', step_time: 'Time',
-          title_name: 'What is your name?',
-          sub_name: 'Enter your first and last name to join the queue.',
-          title_host: 'Who is your appointment with?',
-          sub_host: 'Type the name of the person you are here to see.',
-          ph_name: 'Type your name',
-          ph_host: 'Type the person’s name',
-          checking_in: 'Checking in:',
-          btn_back: 'Back', btn_join: 'Join Queue', btn_next: 'Next', btn_continue: 'Continue', btn_done: 'Done',
-          appt_with: 'Appointment with',
-          time_title: 'What time is your appointment?',
-          time_sub: 'Select your scheduled time.',
-          morning: 'Morning', afternoon: 'Afternoon', space: 'Space',
-          err_name: 'Please enter your name.',
-          err_host: 'Please enter the name of the person you are seeing.',
-          err_time: 'Please select your appointment time.',
-          err_generic: 'Could not check in. Please try again.',
-          err_services: 'Services are unavailable. Please ask staff for help.',
-          unavailable_sub: 'is currently unavailable',
-          done_checked: 'You are checked in,',
-          done_next: 'You are next!',
-          done_one: 'There is 1 person ahead of you.',
-          done_many: 'There are {n} people ahead of you.',
-          done_watch: 'Please watch the display screens for your name.'
-        },
-        es: {
-          brand: 'Registro',
-          hero_title: '¿En qué podemos ayudarle hoy?',
-          hero_sub: 'Seleccione el servicio que necesita.',
-          step_name: 'Su nombre', step_appt: 'Cita', step_time: 'Hora',
-          title_name: '¿Cuál es su nombre?',
-          sub_name: 'Escriba su nombre y apellido para entrar en la fila.',
-          title_host: '¿Con quién tiene su cita?',
-          sub_host: 'Escriba el nombre de la persona que va a ver.',
-          ph_name: 'Escriba su nombre',
-          ph_host: 'Escriba el nombre de la persona',
-          checking_in: 'Registrando:',
-          btn_back: 'Atrás', btn_join: 'Registrarse', btn_next: 'Siguiente', btn_continue: 'Continuar', btn_done: 'Listo',
-          appt_with: 'Cita con',
-          time_title: '¿A qué hora es su cita?',
-          time_sub: 'Seleccione la hora de su cita.',
-          morning: 'Mañana', afternoon: 'Tarde', space: 'Espacio',
-          err_name: 'Por favor, escriba su nombre.',
-          err_host: 'Por favor, escriba el nombre de la persona que va a ver.',
-          err_time: 'Por favor, seleccione la hora de su cita.',
-          err_generic: 'No se pudo registrar. Intente de nuevo.',
-          err_services: 'Los servicios no están disponibles. Pida ayuda al personal.',
-          unavailable_sub: 'no está disponible en este momento',
-          done_checked: 'Usted está registrado,',
-          done_next: '¡Usted es el siguiente!',
-          done_one: 'Hay 1 persona delante de usted.',
-          done_many: 'Hay {n} personas delante de usted.',
-          done_watch: 'Por favor, esté atento a las pantallas para su nombre.'
-        }
-      };
+      // All kiosk text comes from the server, in the chosen language (see Services & languages).
+      // T[language] holds the wording for that language, loaded when the language is chosen.
+      var T = {};
+      var languages = [];    // the languages switched on for the kiosk, from /api/catalog
 
-      // Spanish service names and descriptions, keyed by service code. Review with staff before launch.
-      var SERVICE_ES = {
-        BPI: { name: 'Permisos de construcción e inspecciones', description: 'Permisos, revisión de planos e inspecciones' },
-        BSC: { name: 'Cumplimiento de seguridad de construcción', description: 'Inspecciones y cumplimiento de seguridad de construcción' },
-        CR: { name: 'Registro de contratistas', description: 'Registro y licencias de contratistas' },
-        CE: { name: 'Cumplimiento de códigos', description: 'Cumplimiento de códigos, infracciones y casos' },
-        BTD: { name: 'Recibos de impuestos comerciales', description: 'Recibos de impuestos comerciales y servicios relacionados' },
-        UF: { name: 'Paisajismo y silvicultura urbana', description: 'Paisajismo, silvicultura urbana y servicios de árboles' },
-        LS: { name: 'Búsqueda de gravámenes y permisos vencidos', description: 'Búsqueda de gravámenes y permisos vencidos' },
-        ZD: { name: 'Zonificación', description: 'Preguntas y revisiones de zonificación' },
-        AB: { name: 'Facturación de alarmas', description: 'Permisos y servicios de facturación de alarmas' },
-        AC: { name: 'Registro de citas', description: 'Registro para citas programadas' }
-      };
-
-      // Icon per service code. Services without an entry still appear, without an icon.
+      // Shared drawing for the Shift and Backspace keys and the tiles' icons (see icons.js).
       var SVG_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
       var SVG_CLOSE = '</svg>';
-      var SERVICE_DETAILS = {
-        BPI: {
-          description: 'Permits, plan review, inspections',
-          icon: SVG_OPEN + '<path d="M4 21V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v16"/><path d="M15 9h4a1 1 0 0 1 1 1v11"/><path d="M3 21h18"/><path d="M8 7h2M8 11h2M8 15h2M11 7h2M11 11h2M11 15h2"/>' + SVG_CLOSE
-        },
-        ZD: {
-          description: 'Zoning questions and reviews',
-          icon: SVG_OPEN + '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>' + SVG_CLOSE
-        },
-        CE: {
-          description: 'Code compliance, violations and cases',
-          icon: SVG_OPEN + '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>' + SVG_CLOSE
-        },
-        BSC: {
-          description: 'Building safety inspections and compliance',
-          icon: SVG_OPEN + '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 13l2 2 4-4"/>' + SVG_CLOSE
-        },
-        CR: {
-          description: 'Contractor registration and licensing',
-          icon: SVG_OPEN + '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/>' + SVG_CLOSE
-        },
-        AC: {
-          description: 'Check in for scheduled appointments',
-          icon: SVG_OPEN + '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/>' + SVG_CLOSE
-        },
-        LS: {
-          description: 'Search for liens and expired permits',
-          icon: SVG_OPEN + '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h5"/><path d="M14 3l5 5v4"/><circle cx="16.5" cy="16.5" r="2.8"/><path d="M18.5 18.5 21 21"/>' + SVG_CLOSE
-        },
-        BTD: {
-          description: 'Business tax receipts and related services',
-          icon: SVG_OPEN + '<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>' + SVG_CLOSE
-        },
-        AB: {
-          description: 'Alarm permits and billing services',
-          icon: SVG_OPEN + '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4M12 3v2"/>' + SVG_CLOSE
-        },
-        UF: {
-          description: 'Landscape, urban forestry and tree services',
-          icon: SVG_OPEN + '<path d="M12 3l5 6h-3l4 5h-4v6h-4v-6H6l4-5H7z"/>' + SVG_CLOSE
-        }
-      };
       var SHIFT_ICON = SVG_OPEN + '<path d="M12 4l8 8h-5v8H9v-8H4z"/>' + SVG_CLOSE;
       var BACKSPACE_ICON = SVG_OPEN + '<path d="M21 6H9l-6 6 6 6h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/><path d="M14 10l-4 4M10 10l4 4"/>' + SVG_CLOSE;
 
@@ -584,20 +497,27 @@
       }
 
       function t(key) {
-        return (T[LANG] && T[LANG][key]) || T.en[key] || key;
+        return (T[LANG] && T[LANG][key]) || (T.en && T.en[key]) || key;
       }
 
+      // Service names and descriptions arrive already translated (see loadServices).
       function svcName(s) {
-        return LANG === 'es' && SERVICE_ES[s.code] ? SERVICE_ES[s.code].name : s.name;
+        return s.name;
       }
 
       function svcDesc(code) {
-        if (LANG === 'es' && SERVICE_ES[code]) return SERVICE_ES[code].description;
-        return (SERVICE_DETAILS[code] || {}).description || '';
+        var s = servicesCache && servicesCache.find(function (x) { return x.code === code; });
+        return s ? s.description : '';
+      }
+
+      // The language a press of the header button switches to: the next one switched on.
+      function nextLanguage() {
+        var i = languages.findIndex(function (l) { return l.code === LANG; });
+        return languages[(i + 1) % languages.length];
       }
 
       function isAppointment() {
-        return !!service && service.code === APPOINTMENT_CODE;
+        return !!service && !!service.asksAppointment;
       }
 
       // Sets every element marked with data-i18n, and the parts that are built in code.
@@ -611,7 +531,9 @@
         var onTime = !$('step-time').classList.contains('hidden');
         renderSteps(onTime ? 2 : stage === 'host' ? 1 : 0);
         if (servicesCache) renderServices();
-        $('lang-toggle').textContent = LANG === 'en' ? 'Español' : 'English';
+        var next = nextLanguage();
+        $('lang-toggle').textContent = next ? next.name : '';
+        $('lang-toggle').classList.toggle('hidden', languages.length < 2);
         refreshCurrentStep();
       }
 
@@ -811,7 +733,6 @@
       }
 
       function serviceTile(s, i) {
-        var details = SERVICE_DETAILS[s.code] || {};
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'tile tile-enter' + (s.available ? '' : ' unavailable');
@@ -819,7 +740,7 @@
 
         var icon = document.createElement('span');
         icon.className = 'icon';
-        if (details.icon) icon.innerHTML = details.icon;
+        if (s.icon) icon.innerHTML = iconSvg(s.icon);
 
         var title = document.createElement('span');
         title.className = 'tname';
@@ -840,15 +761,20 @@
       }
 
       // Builds the service cards in the current language, in 4-3-3 rows.
+      // The tiles go in the rows chosen in Services & languages: services with the same row number share a row,
+      // and the list already arrives in order within it. A service with no row yet goes on a row of its own at the end.
       function renderServices() {
         var tiles = $('tiles');
         tiles.textContent = '';
+        var previous = null;
         servicesCache.forEach(function (s, i) {
-          if (i === 4 || i === 7) {
+          var row = s.row === null || s.row === undefined ? 'none' : s.row;
+          if (i > 0 && row !== previous) {
             var brk = document.createElement('div');
             brk.className = 'row-break';
             tiles.appendChild(brk);
           }
+          previous = row;
           tiles.appendChild(serviceTile(s, i));
         });
       }
@@ -856,22 +782,71 @@
       // A short fingerprint of what matters for display, so a poll/push that changes nothing
       // doesn't re-render the tiles (and restart their entrance animation) for no reason.
       function servicesSignature(list) {
-        return list.map(function (s) { return s.code + ':' + (s.available ? 1 : 0) + ':' + (s.unavailableMessage || ''); }).join('|');
+        return list.map(function (s) {
+          return [s.code, s.row, s.name, s.description, s.icon, s.asksAppointment ? 1 : 0, s.available ? 1 : 0, s.unavailableMessage || ''].join(':');
+        }).join('|');
       }
       var lastServicesSig = '';
 
+      // ---- Connection to the server ----
+      // The kiosk cannot work without the server, so when it cannot be reached a full-screen message sends
+      // people to staff. It appears after two failed checks in a row (or at once when the browser says it is
+      // offline), so one slow reply does not interrupt anyone. When the server answers again the message goes
+      // away and the kiosk starts over from the welcome screen, with the services and wording read afresh.
+      var OFFLINE_AFTER = 2;
+      var failedChecks = 0;
+      var offline = false;
+
+      function showOffline() {
+        offline = true;
+        clearTimeout(resetTimer);
+        $('offline').classList.remove('hidden');
+      }
+
+      function noteConnection(ok) {
+        if (ok) {
+          failedChecks = 0;
+          if (offline) {
+            offline = false;
+            $('offline').classList.add('hidden');
+            resumeAfterOutage();
+          }
+          return;
+        }
+        failedChecks += 1;
+        pollSoon();
+        if (!offline && (failedChecks >= OFFLINE_AFTER || navigator.onLine === false)) showOffline();
+      }
+
+      // Starts again from the welcome screen: whoever was in the middle of checking in could not finish, and
+      // the services or wording may have changed while the kiosk was cut off.
+      function resumeAfterOutage() {
+        reset();
+        loadStrings('en').catch(function () {}).then(function () {
+          applyLanguage();
+          return loadLanguages();
+        }).then(function () {
+          renderLanguageButtons();
+          applyLanguage();
+          greetInEveryLanguage();
+          return loadServices();
+        }).catch(function () {});
+      }
+
       async function loadServices() {
         try {
-          var res = await fetch(BASE + 'api/services');
+          var res = await fetch(BASE + 'api/services?lang=' + encodeURIComponent(LANG), { cache: 'no-store' });
           if (!res.ok) throw new Error('Could not load services');
           var list = await res.json();
           var sig = servicesSignature(list);
           var changed = sig !== lastServicesSig;
           servicesCache = list;
           lastServicesSig = sig;
+          noteConnection(true);
           return changed;
         } catch (err) {
           $('service-error').textContent = t('err_services');
+          noteConnection(false);
           return false;
         }
       }
@@ -880,16 +855,101 @@
       // would still look open on a kiosk that had already loaded the page. Only re-renders the
       // tiles (and only while the service list is on screen) when something actually changed,
       // so it doesn't interrupt someone partway through checking in.
-      async function refreshServices() {
+      // Passing true also checks which languages are on. A ticket changing anywhere in the lobby does not need
+      // that, so the live updates leave it out; the regular check and a catalogue change include it.
+      async function refreshServices(withLanguages) {
         var changed = await loadServices();
         if (changed && !$('step-service').classList.contains('hidden')) renderServices();
+        // A language switched on or off shows up on the welcome screen and the header button without a reload.
+        if (withLanguages === true && await loadLanguages()) {
+          renderLanguageButtons();
+          applyLanguage();
+          greetInEveryLanguage();
+        }
+      }
+
+      // Loads the wording for a language, then its services, and redraws the kiosk in that language.
+      async function loadStrings(lang) {
+        var res = await fetch(BASE + 'api/i18n/' + encodeURIComponent(lang), { cache: 'no-store' });
+        if (!res.ok) throw new Error('Could not load the wording');
+        T[lang] = (await res.json()).strings;
+      }
+
+      // If the wording cannot be loaded, the kiosk stays in the language it was in.
+      async function switchLanguage(lang) {
+        var previous = LANG;
+        LANG = lang;
+        try {
+          await loadStrings(lang);
+          await loadServices();
+        } catch (err) {
+          LANG = previous;
+          throw err;
+        }
+        applyLanguage();
       }
 
       function chooseLanguage(lang) {
-        LANG = lang;
-        applyLanguage();
-        if (!servicesCache) $('service-error').textContent = t('err_services');
-        show('step-service');
+        switchLanguage(lang).catch(function () { /* carry on in the current language */ }).then(function () {
+          if (!servicesCache) $('service-error').textContent = t('err_services');
+          show('step-service');
+        });
+      }
+
+      // The languages switched on for the kiosk. Returns true when the list has changed since it was last read.
+      var lastLanguagesSig = '';
+      async function loadLanguages() {
+        try {
+          var res = await fetch(BASE + 'api/catalog', { cache: 'no-store' });
+          if (!res.ok) throw new Error('catalog');
+          var list = (await res.json()).languages;
+          var sig = JSON.stringify(list);
+          var changed = sig !== lastLanguagesSig;
+          languages = list;
+          lastLanguagesSig = sig;
+          return changed;
+        } catch (err) {
+          return false;
+        }
+      }
+
+      // The greeting under the English one: the welcome line in each other language that is on, so the screen
+      // never greets in a language that has been switched off. A language with no translation of it adds nothing.
+      function renderWelcome() {
+        var box = $('welcome-others');
+        box.textContent = '';
+        var english = (T.en || {}).welcome_title;
+        languages.forEach(function (l) {
+          if (l.code === 'en') return;
+          var text = (T[l.code] || {}).welcome_title;
+          if (!text || text === english) return;
+          var p = document.createElement('p');
+          p.className = 'welcome-title-es';
+          p.textContent = text;
+          box.appendChild(p);
+        });
+      }
+
+      // Reads the wording of every language that is on, then draws the greetings.
+      function greetInEveryLanguage() {
+        return Promise.all(languages.filter(function (l) { return l.code !== 'en'; }).map(function (l) {
+          return loadStrings(l.code).catch(function () {});
+        })).then(renderWelcome);
+      }
+
+      // The welcome screen offers every language that is switched on.
+      function renderLanguageButtons() {
+        var box = $('lang-buttons');
+        box.textContent = '';
+        languages.forEach(function (l) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'lang-btn';
+          b.setAttribute('data-lang', l.code);
+          b.textContent = l.name;
+          b.addEventListener('click', function () { chooseLanguage(l.code); scheduleReset(IDLE_MS); });
+          box.appendChild(b);
+        });
       }
 
       // Moves to a stage, saving what was typed on the stage being left.
@@ -946,7 +1006,7 @@
         hostName = '';
         apptTime = '';
         $('chosen').textContent = svcName(s);
-        $('chosen-icon').innerHTML = (SERVICE_DETAILS[s.code] || {}).icon || '';
+        $('chosen-icon').innerHTML = s.icon ? iconSvg(s.icon) : '';
         $('host-label').textContent = '';
         enterStage('name');
         scheduleReset(IDLE_MS);
@@ -1002,6 +1062,11 @@
           show('step-done');
           scheduleReset(DONE_MS);
         } catch (err) {
+          // A failure to reach the server at all (not an answer from it) means the connection is down.
+          if (err instanceof TypeError) {
+            failedChecks = OFFLINE_AFTER - 1;
+            noteConnection(false);
+          }
           var onTimeStep = !$('step-time').classList.contains('hidden');
           $(onTimeStep ? 'time-error' : 'name-error').textContent = err.message;
         } finally {
@@ -1011,13 +1076,9 @@
         }
       }
 
-      document.querySelectorAll('.lang-btn').forEach(function (b) {
-        b.addEventListener('click', function () { chooseLanguage(b.getAttribute('data-lang')); scheduleReset(IDLE_MS); });
-      });
       $('lang-toggle').addEventListener('click', function () {
-        LANG = LANG === 'en' ? 'es' : 'en';
-        applyLanguage();
-        scheduleReset(IDLE_MS);
+        var next = nextLanguage();
+        if (next) switchLanguage(next.code).catch(function () { /* stay in the current language */ }).then(function () { scheduleReset(IDLE_MS); });
       });
       $('back').addEventListener('click', function () {
         if (stage === 'host') enterStage('name');
@@ -1035,7 +1096,7 @@
 
       // Physical keyboard support, for a kiosk with one attached.
       document.addEventListener('keydown', function (e) {
-        if ($('step-name').classList.contains('hidden')) return;
+        if (offline || $('step-name').classList.contains('hidden')) return;
         if (e.key === 'Enter') { next(); e.preventDefault(); return; }
         if (e.key === 'Backspace') { name = name.slice(0, -1); renderName(); e.preventDefault(); return; }
         if (/^[A-Za-z]$/.test(e.key)) { letter(e.key); return; }
@@ -1049,9 +1110,32 @@
       // Live service availability: instant via Socket.IO when it gets through, with a 15-second
       // poll as a fallback for hosts where it doesn't (same pattern as the staff and monitor pages).
       if (window.io) {
-        io({ path: BASE + 'socket.io' }).on('queue:changed', refreshServices);
+        var socket = io({ path: BASE + 'socket.io' });
+        socket.on('queue:changed', function () { refreshServices(false).catch(function () {}); });
+        socket.on('connect', function () { refreshServices(true).catch(function () {}); });
+        // Names, wording or languages were edited: re-read the wording for the language on screen as well.
+        socket.on('catalog:changed', function () {
+          refreshServices(true).catch(function () {});
+          loadStrings(LANG).then(applyLanguage).catch(function () {}).then(greetInEveryLanguage);
+        });
       }
-      setInterval(refreshServices, 15000);
+      // Checks every 15 seconds, and every 3 while the connection is in doubt, so the message goes away quickly.
+      var pollTimer = null;
+      function pollServer() {
+        refreshServices(true).catch(function () {}).then(function () {
+          clearTimeout(pollTimer);
+          pollTimer = setTimeout(pollServer, failedChecks || offline ? 3000 : 15000);
+        });
+      }
+      // Brings the next check forward once something has gone wrong.
+      function pollSoon() {
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(pollServer, 3000);
+      }
+      pollTimer = setTimeout(pollServer, 15000);
+      // The browser noticing the network come or go is a quicker signal than the next check.
+      window.addEventListener('offline', function () { noteConnection(false); });
+      window.addEventListener('online', function () { refreshServices(true).catch(function () {}); });
 
       // The kiosk starts once its timers are known from the server.
       function applyKioskSettings(s) {
@@ -1062,11 +1146,20 @@
       window.appSettingsReady.then(function (s) {
         applyKioskSettings(s);
         window.watchAppSettings(applyKioskSettings);
-        loadServices().then(function () {
-          if (!$('step-service').classList.contains('hidden')) renderServices();
-        });
-        applyLanguage();
-        show('step-welcome');
+        loadStrings(LANG)
+          .catch(function () { /* the wording stays as keys until it loads */ })
+          .then(function () {
+            applyLanguage();
+            return loadLanguages();
+          })
+          .then(function () {
+            renderLanguageButtons();
+            applyLanguage();
+            show('step-welcome');
+            greetInEveryLanguage();
+            return loadServices();
+          })
+          .catch(function () { show('step-welcome'); });
       });
     })();
   </script>

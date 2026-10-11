@@ -8,7 +8,7 @@ A walk-in queue system for a public counter. One Node.js server and a MySQL/Mari
 | Customer kiosk | `/kiosk.html` | Touch screen. The customer picks a language and a service, types their name, and gets a ticket. |
 | Queue portal | `/queue.html` | Staff sign in with their own account and a counter name. They call, complete, transfer, or remove customers, and add walk-ins. |
 | My account | `/account.html` | Everyone signed in. Change your display name, User ID, and password. |
-| Management | `/manage.html` | Managers and Admins. Tabs: **Services**, **Staff**, **Reports** and, for Admins only, **Settings** and **Health & audit**. |
+| Management | `/manage.html` | Managers and Admins. Tabs: **Open & close**, **Staff**, **Reports** and, for Admins only, **Settings** and **Health & audit**. |
 | Lobby monitor | `/monitor.html` | Public display for a TV. Shows who is being helped and who is waiting. |
 
 For step-by-step hosting instructions aimed at non-technical readers, see [DEPLOY-CPANEL.md](DEPLOY-CPANEL.md). For Windows Server, see [DEPLOY-WINDOWS.md](DEPLOY-WINDOWS.md).
@@ -63,7 +63,7 @@ Past tickets keep the staff name as it was when the customer was called. Renamin
 | Role | Can do |
 |---|---|
 | **Staff** | Use the queue portal: call, complete, transfer, remove, and add customers. Edit their own profile and password on My account. |
-| **Manager** | Everything Staff can do. On Management: **Services** and **Reports**, plus the **Staff** tab for **Staff accounts only**: add, edit name and User ID, reset password, disable, and remove. Managers can't change roles. |
+| **Manager** | Everything Staff can do. On Management: **Open & close** and **Reports**, plus the **Staff** tab for **Staff accounts only**: add, edit name and User ID, reset password, disable, and remove. Managers can't change roles. |
 | **Admin** | Everything Manager can do, plus manage every account, including other Managers and Admins, change roles, and use the **Settings** and **Health & audit** tabs. |
 
 Nobody can change their own role, disable their own account, or remove their own account. The last active admin can't be disabled, demoted or removed.
@@ -82,9 +82,9 @@ Passwords are hashed with Node's built-in `scrypt`. Sessions are a signed cookie
 
 **Sign-in lockout:** after a set number of failed sign-ins for a User ID (5 by default), that User ID is locked for a set time (15 minutes by default), even with the right password. A successful sign-in starts the count again. Settings → Security and sessions changes both numbers, and 0 turns the lockout off. The count comes from the audit log, so a lockout also ends when the failed attempts are older than the lockout time.
 
-## Management: Services tab
+## Management: Open & close tab
 
-Services are listed alphabetically, one card each. The card's edge is green when the service is open and red when it's closed. Closed services show the reason in a red banner.
+Services are listed in the order the kiosk shows them, under the heading of the department group they belong to (services with no group are under **Other services**), one compact card each. The card's edge is green when the service is open and red when it's closed. Closed services show the reason in a red banner. At the top, a search box finds a service by name or code, **All / Closed / With recurring closures** filters the list, and a line counts how many services are open and closed. A card's recurring closures are folded away behind its **Recurring closures** button, which stays open while you work on them.
 
 Two kinds of closure exist, and a manual choice always takes precedence over a recurring one:
 
@@ -100,11 +100,28 @@ Two kinds of closure exist, and a manual choice always takes precedence over a r
 
 Managers and Admins can also reopen a closed queue from the queue portal's **⋯** menu.
 
-**Recurring closures:** each has a reason, a day of the week, a start and end time, and either every week or specific weeks of the month (1st, 2nd, 3rd, 4th, and/or last). For example: "Code Compliance is closed 12 pm to 4 pm on the 1st and 3rd Wednesday of every month." Pause, edit or delete them from the card.
+**Recurring closures:** each has a reason, a day of the week, a start and end time, and either every week or specific weeks of the month (1st, 2nd, 3rd, 4th, and/or last). For example: "Code Compliance is closed 12 pm to 4 pm on the 1st and 3rd Wednesday of every month." Pause, edit or delete them from the card, under **Recurring closures**.
 
 Nothing runs on a timer. Availability is worked out from the current time on every request (`availability.js`), so there's no scheduled job to keep running.
 
 A closed service still shows on the kiosk, queue portal and monitor, dimmed, with the reason. Customers can't check in while it's closed; the kiosk and the server both enforce this.
+
+## Services & languages (admins only)
+
+Open it from the **Services & languages** tab on Management. It has four tabs:
+
+- **Services:** one card per service. Add a service with a code (2 to 10 letters or numbers), a name, a description, an icon, a department group and a colour for the monitor (used when the service is not in a group). Change any of these and press **Save** on that card. The **Kiosk layout** panel at the top of the tab is where you arrange the kiosk: drag a service to move it along its row or to another row, drop it on **Add a row** to start a new row, and use **Remove row** on an empty row. With a service selected, the arrow keys move it too. Press **Save layout** to apply it, or **Discard changes** to go back; nothing changes on the kiosk until you save, and empty rows are left out. The panel warns when a row has more than four services, which may wrap on a smaller screen. A new service goes at the end of the last row, or on a new row when that one has four. Existing services are put in rows of at most four, in their old order, the first time the app starts with this feature. Two switches on each card change how a service behaves. **Asks who they are seeing and the appointment time** makes the kiosk, the server and the **Add customer** form ask those two questions for it; Appointment Check-In has it on by default. **Always in staff watched queues** pins it in every staff member's Your Watched Queues, where it cannot be unwatched and sits first (hidden while it is empty and open); Appointment Check-In has this on too. Any service can have either or both. Turning such a service off or deleting it asks you first, because it loses these behaviours. An install that already had Appointment Check-In keeps both behaviours when the app is first started with this feature. Turn a service off with **On the kiosk**; if customers are waiting for it, you are asked first, because they would disappear from the queue screens. A service with customers on record cannot be deleted, because its history must stay in the reports. Turn it off instead.
+- **Department groups:** services in the same group share one card on the lobby monitor, such as Building Dept. Add a group with an id (lower case letters, numbers and dashes), a name, an icon and a colour. **Order** sets where the group is listed in Settings, under Lobby monitor. The order on each monitor itself is the order chosen there. A group that still has services cannot be deleted. Deleting a group, or a service, also takes it out of the left and right monitor panels in Settings; a panel left empty goes back to its default.
+- **Languages:** add a language with its code (for example `pt-br`) and its name as people in that language write it. Turn a language on or off here. **Delete** removes a language and every translation in it for good; turn it off instead to keep them. The kiosk offers the languages that are on, and its welcome screen greets in each one that has a translation of the welcome line (under Kiosk wording). English is always on and cannot be deleted.
+- **Translations:** choose a language and translate each service name and description, each group name, and each line of kiosk wording. The English is shown beside each item. An empty box uses the English. Tick **Show only items still to translate** to work through what is left.
+
+Changes show on the kiosk, the queue portal and the monitors straight away, without a reload. Changes you have made on a card but not saved are kept when you save another card, and the page asks before it throws them away.
+
+The default services are set up on the first start only. A default service you delete stays deleted after a restart, and a code that used to belong to a retired service (for example PRM) can be reused.
+
+The lobby monitor draws any group or service set in **Management → Settings → Lobby monitor**, including new ones. A department and one of its own services cannot both be chosen.
+
+Spanish is set up by default. The Spanish group names and any Spanish service text were written for the first setup and should be reviewed with staff before use.
 
 ## Management: Reports tab
 
@@ -152,7 +169,7 @@ Press **Save settings** at the foot of the tab, then use **Run cleanup now** to 
 
 - **Call next** starts service right away and records the counter and the staff member.
 - **Complete**, **Transfer**, **Return to waiting** and **Remove** act on customers being helped.
-- **Add customer** adds a walk-in to a queue, with an appointment time for the Appointment Check-In service.
+- **Add customer** adds a walk-in to a queue, with who the customer is seeing and the appointment time for a service set up for appointments (Appointment Check-In by default).
 - Services are listed alphabetically in the dialogs.
 - **Service Queues** is a sidebar. It collapses on narrow screens so the lobby list stays in view. Click a queue to watch or stop watching it. If you have no saved default, the foot of the sidebar offers **Save as my default**. Once one is saved, that prompt disappears, and you edit or clear the default on **My account**. The saved default is applied every time you sign in, on any computer. Changes you make during a session stay on that computer until your next sign-in.
 - The **bell** turns on desktop alerts. An alert appears when someone checks in to a queue you're watching. It shows the name, the service, and their position in line, and closes after 6 seconds. The alert needs the browser's notification permission.
@@ -160,6 +177,8 @@ Press **Save settings** at the foot of the tab, then use **Run cleanup now** to 
 ## Customer kiosk
 
 Customers choose a language, then a service, type their name (and, for appointments, who they're seeing and the time), and get a ticket number. The screen returns to the start after the confirmation time, or after the inactivity time. Both are set in **Management → Settings → Kiosk** (10 seconds and 60 seconds by default).
+
+**When the server cannot be reached:** the kiosk checks the server every 15 seconds (every 3 while something looks wrong). After two failed checks in a row, or as soon as the browser reports it is offline, or when a check-in cannot be sent, it covers the screen with "Kiosk unavailable" in English and Spanish and sends people to a staff member. When the server answers again the message goes away within a few seconds and the kiosk starts over from the welcome screen. Nobody needs to touch it. A check-in that was in progress is lost, so the customer starts again. This needs the kiosk page to be loaded already; a kiosk restarted while the network is down shows the browser's own error page.
 
 ## Lobby monitor
 
@@ -205,7 +224,7 @@ Set these in **Management → Settings → Lobby monitor**. The `PANELS` setting
 
 ## Security notes
 
-- The kiosk and monitor are public. The monitor shows each customer's first name and last initial, not the full name. Only use these screens where that's acceptable.
+- The kiosk and monitor are public. The monitor shows each customer's first name and last initial, not the full name, and the data behind it (`/api/queue`) carries only that: full names and appointment details are sent only to signed-in staff, through `/api/staff/queue`. Only use these screens where that's acceptable.
 - Give every staff member their own account, and disable (rather than delete) accounts when someone leaves, so past records stay readable.
 - Never share passwords or `SESSION_SECRET` in chat, email or screenshots. If one is exposed, change it straight away. Changing `SESSION_SECRET` signs everyone out.
 - Serve the site over HTTPS. The session cookie is marked `Secure` when the request arrives over HTTPS.
@@ -219,6 +238,7 @@ server.js          Express routes, optional BASE_PATH handling, Socket.IO update
 auth.js            Password hashing, password rules and session cookies (Node's built-in crypto)
 availability.js    Works out "open or closed right now" from manual choices and recurring closures
 reports.js         Checks report date ranges
+privacy.js         What the public queue data may show (customers as first name and last initial)
 settings.js        App settings: names, limits and defaults for Settings → Kiosk, monitor, security, branding and audit
 db.js              All database access (MySQL via mysql2), including audit log, cleanup and database check
 db/schema.sql      Tables and default services (runs on startup)

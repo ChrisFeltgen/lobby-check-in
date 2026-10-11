@@ -4,6 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
 const { resolveAvailability, isScheduleActiveAt } = require('./availability');
+const catalog = require('./catalog');
+const { seedCatalog, seedAddedWording } = require('./catalog-seed');
+// Services are shown in kiosk rows, and in order within a row. One with no row yet goes last.
+const SERVICE_ORDER = 'kiosk_row IS NULL, kiosk_row, sort_order, name';
+const { UI_STRINGS } = require('./ui-strings');
 
 // All database access lives in this file so the rest of the app stays engine-agnostic.
 const pool = mysql.createPool({
@@ -41,7 +46,9 @@ async function ensureColumn(conn, table, column, definition) {
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
     [table, column]
   );
-  if (!row.n) await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+  if (row.n) return false;
+  await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+  return true;
 }
 
 // Settings values were first stored in VARCHAR(255), which cut off a logo. Widen the column if it is still that size.
@@ -76,6 +83,34 @@ function splitStatements(sql) {
   return sql.split(';').map((s) => s.trim()).filter(Boolean);
 }
 
+// The statements in schema.sql that put the default services in place. They belong to the first start only:
+// once the catalogue has been set up, an admin may delete a default service or reuse a retired code, and a
+// later restart must not undo that.
+function isDefaultServiceStatement(statement) {
+  const code = statement.split('\n').filter((line) => !/^\s*--/.test(line)).join('\n').trim();
+  return /^(INSERT\s+(IGNORE\s+)?INTO|UPDATE)\s+services\b/i.test(code);
+}
+
+// Gives every service without a row one, so the kiosk looks as it did before rows could be chosen: the active
+// services in their order, at most 4 to a row. Turned-off services go on the last row. Only services with no row
+// are touched, so this does nothing once rows have been set.
+async function backfillKioskRows(conn) {
+  const [missing] = await conn.query('SELECT code, active FROM services WHERE kiosk_row IS NULL ORDER BY active DESC, sort_order, name');
+  if (!missing.length) return;
+  const [[last]] = await conn.query('SELECT COALESCE(MAX(kiosk_row), 0) AS m FROM services');
+  const active = missing.filter((s) => s.active);
+  const sizes = catalog.layoutRows(active.length);
+  let row = Number(last.m);
+  let index = 0;
+  for (const size of sizes) {
+    row += 1;
+    for (const s of active.slice(index, index + size)) await conn.query('UPDATE services SET kiosk_row = ? WHERE code = ?', [row, s.code]);
+    index += size;
+  }
+  const lastRow = Math.max(row, 1);
+  for (const s of missing.filter((x) => !x.active)) await conn.query('UPDATE services SET kiosk_row = ? WHERE code = ?', [lastRow, s.code]);
+}
+
 async function init() {
   const sql = fs.readFileSync(path.join(__dirname, 'db', 'schema.sql'), 'utf8');
   const statements = splitStatements(sql);
@@ -95,10 +130,25 @@ async function init() {
     await ensureColumn(conn, 'users', 'default_queues', 'TEXT NULL');
     await ensureColumn(conn, 'users', 'sessions_revoked_at', 'BIGINT NULL');
     await ensureSettingValueType(conn);
+    await ensureColumn(conn, 'services', 'description', 'VARCHAR(255) NULL');
+    await ensureColumn(conn, 'services', 'icon', 'VARCHAR(40) NULL');
+    await ensureColumn(conn, 'services', 'color', 'VARCHAR(7) NULL');
+    await ensureColumn(conn, 'services', 'group_id', 'VARCHAR(40) NULL');
+    await ensureColumn(conn, 'services', 'kiosk_row', 'INT NULL');
+    // Before these two columns, the appointment questions and the pinned queue belonged to the code AC alone.
+    // An install that already has that service keeps both behaviours; a new one gets them when the catalogue is seeded.
+    const addedAppointment = await ensureColumn(conn, 'services', 'asks_appointment', 'TINYINT(1) NOT NULL DEFAULT 0');
+    const addedPinned = await ensureColumn(conn, 'services', 'pinned', 'TINYINT(1) NOT NULL DEFAULT 0');
+    if (addedAppointment || addedPinned) await conn.query("UPDATE services SET asks_appointment = 1, pinned = 1 WHERE code = 'AC'");
     await ensureServingStatus(conn);
+    const [[seeded]] = await conn.query("SELECT COUNT(*) AS n FROM app_settings WHERE setting_key = 'catalog_seeded'");
     for (const stmt of statements.filter((s) => !s.startsWith('CREATE'))) {
+      if (seeded.n && isDefaultServiceStatement(stmt)) continue;
       await conn.query(stmt);
     }
+    await seedCatalog(conn);
+    await seedAddedWording(conn);
+    await backfillKioskRows(conn);
   } finally {
     conn.release();
   }
@@ -118,19 +168,260 @@ async function serviceAvailabilityMap() {
   return map;
 }
 
-async function listServices() {
+// Translated text for one language, keyed by item key (for example 'service.BPI.name').
+async function getTranslations(lang) {
+  const [rows] = await pool.query('SELECT item_key, value FROM translations WHERE lang = ?', [lang]);
+  const map = {};
+  rows.forEach((r) => { map[r.item_key] = r.value; });
+  return map;
+}
+
+async function groupLabel(id) {
+  const [[g]] = await pool.query('SELECT label FROM service_groups WHERE id = ?', [id]);
+  return g ? g.label : null;
+}
+
+// Active services for the kiosk and the public screens. With a language, names and descriptions are
+// translated where a translation exists; anything missing falls back to English.
+async function listServices(lang) {
+  const tr = lang && lang !== 'en' ? await getTranslations(lang) : {};
   const [rows] = await pool.query(
-    'SELECT code, name, route FROM services WHERE active = 1 ORDER BY sort_order, name'
+    'SELECT code, name, description, icon, color, route, group_id, kiosk_row, asks_appointment, pinned FROM services WHERE active = 1 ORDER BY ' + SERVICE_ORDER
   );
   const avail = await serviceAvailabilityMap();
   return rows.map((s) => ({
     code: s.code,
-    name: s.name,
+    name: tr[catalog.keys.serviceName(s.code)] || s.name,
+    description: tr[catalog.keys.serviceDescription(s.code)] || s.description || '',
+    icon: s.icon,
+    color: s.color,
     route: s.route,
+    groupId: s.group_id,
+    row: s.kiosk_row,
+    asksAppointment: !!s.asks_appointment,
+    pinned: !!s.pinned,
     available: avail[s.code] ? avail[s.code].available : true,
     unavailableMessage: avail[s.code] && !avail[s.code].available ? avail[s.code].message : null,
   }));
 }
+
+// Every service, including inactive ones, for the Services & languages page. English only.
+async function listCatalogServices() {
+  const [rows] = await pool.query(
+    `SELECT s.code, s.name, s.description, s.icon, s.color, s.route, s.group_id, s.active, s.sort_order, s.kiosk_row, s.asks_appointment, s.pinned,
+            (SELECT COUNT(*) FROM tickets t WHERE t.service_code = s.code) AS ticket_count,
+            (SELECT COUNT(*) FROM tickets t WHERE t.service_code = s.code AND t.created_at >= CURDATE()
+               AND t.status IN ('waiting','called','serving')) AS open_count
+     FROM services s ORDER BY s.active DESC, s.kiosk_row IS NULL, s.kiosk_row, s.sort_order, s.name`
+  );
+  return rows.map((s) => ({
+    code: s.code,
+    name: s.name,
+    description: s.description || '',
+    icon: s.icon,
+    color: s.color,
+    route: s.route,
+    groupId: s.group_id,
+    active: !!s.active,
+    asksAppointment: !!s.asks_appointment,
+    pinned: !!s.pinned,
+    row: s.kiosk_row,
+    sortOrder: s.sort_order,
+    hasTickets: Number(s.ticket_count) > 0,
+    openCount: Number(s.open_count),
+  }));
+}
+
+// A new service goes at the end of the last kiosk row, or on a new row when that one is full, unless a row
+// and position are given. A given row puts it at the end of that row unless a position is given too.
+async function createService(v) {
+  const group = v.groupId ? await groupLabel(v.groupId) : null;
+  let row = v.row;
+  if (row === undefined) {
+    const [[lastRow]] = await pool.query(
+      'SELECT kiosk_row AS r, COUNT(*) AS n FROM services WHERE active = 1 AND kiosk_row IS NOT NULL GROUP BY kiosk_row ORDER BY kiosk_row DESC LIMIT 1'
+    );
+    row = !lastRow ? 1 : Number(lastRow.n) < catalog.ROW_TILES ? Number(lastRow.r) : Math.min(Number(lastRow.r) + 1, catalog.MAX_ROW);
+  }
+  let order = v.sortOrder;
+  if (order === undefined) {
+    const [[max]] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) AS m FROM services WHERE kiosk_row = ?', [row]);
+    order = Math.min(Number(max.m) + 1, 999);
+  }
+  await pool.query(
+    'INSERT INTO services (code, name, description, icon, color, group_id, route, kiosk_row, sort_order, asks_appointment, pinned, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+    [v.code, v.name, v.description || null, v.icon || null, v.color || null, v.groupId || null, group, row, order, v.asksAppointment ? 1 : 0, v.pinned ? 1 : 0]
+  );
+}
+
+// Changes only the fields that were sent. Choosing a group also sets the older department name (route).
+async function updateService(code, v) {
+  const map = {
+    name: 'name', description: 'description', icon: 'icon', color: 'color', groupId: 'group_id', active: 'active',
+    asksAppointment: 'asks_appointment', pinned: 'pinned', row: 'kiosk_row', sortOrder: 'sort_order',
+  };
+  const sets = [];
+  const params = [];
+  for (const [field, column] of Object.entries(map)) {
+    if (v[field] === undefined) continue;
+    sets.push(column + ' = ?');
+    params.push(typeof v[field] === 'boolean' ? (v[field] ? 1 : 0) : v[field]);
+  }
+  if (v.groupId !== undefined) {
+    sets.push('route = ?');
+    params.push(v.groupId ? await groupLabel(v.groupId) : null);
+  }
+  if (!sets.length) return false;
+  params.push(code);
+  const [result] = await pool.query(`UPDATE services SET ${sets.join(', ')} WHERE code = ?`, params);
+  return result.affectedRows > 0;
+}
+
+// Deletes a service that has never taken a customer. A service with tickets can only be turned off,
+// because its tickets must keep pointing at it for the reports.
+async function deleteService(code) {
+  const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM tickets WHERE service_code = ?', [code]);
+  if (c.n > 0) return { ok: false, reason: 'tickets' };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM service_schedules WHERE service_code = ?', [code]);
+    await conn.query('DELETE FROM service_counters WHERE service_code = ?', [code]);
+    await conn.query('DELETE FROM translations WHERE item_key IN (?, ?)', [catalog.keys.serviceName(code), catalog.keys.serviceDescription(code)]);
+    await conn.query('DELETE FROM services WHERE code = ?', [code]);
+    await conn.commit();
+    return { ok: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// Puts the services in the rows and order given: a list of rows, each a list of codes. A service's row is its
+// place in the list, counting from 1, and so is its position in the row. Services that are turned off are left as
+// they are. All or nothing.
+async function setLayout(rows) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (let r = 0; r < rows.length; r++) {
+      for (let p = 0; p < rows[r].length; p++) {
+        await conn.query('UPDATE services SET kiosk_row = ?, sort_order = ? WHERE code = ?', [r + 1, p + 1, rows[r][p]]);
+      }
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// Department groups, with the codes of their active services. The label is translated when a language is given.
+async function listGroups(lang) {
+  const tr = lang && lang !== 'en' ? await getTranslations(lang) : {};
+  const [groups] = await pool.query('SELECT * FROM service_groups ORDER BY sort_order, label');
+  const [members] = await pool.query('SELECT code, group_id FROM services WHERE active = 1 AND group_id IS NOT NULL ORDER BY ' + SERVICE_ORDER);
+  return groups.map((g) => ({
+    id: g.id,
+    label: tr[catalog.keys.groupLabel(g.id)] || g.label,
+    englishLabel: g.label,
+    icon: g.icon,
+    color: g.color,
+    sortOrder: g.sort_order,
+    codes: members.filter((m) => m.group_id === g.id).map((m) => m.code),
+  }));
+}
+
+async function createGroup(v) {
+  const [[max]] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) AS m FROM service_groups');
+  await pool.query(
+    'INSERT INTO service_groups (id, label, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)',
+    [v.id, v.label, v.icon || null, v.color || null, v.sortOrder !== undefined ? v.sortOrder : Number(max.m) + 1]
+  );
+}
+
+// Changing a group's name also updates the department name on its services.
+async function updateGroup(id, v) {
+  const sets = [];
+  const params = [];
+  if (v.label !== undefined) { sets.push('label = ?'); params.push(v.label); }
+  if (v.icon !== undefined) { sets.push('icon = ?'); params.push(v.icon); }
+  if (v.color !== undefined) { sets.push('color = ?'); params.push(v.color); }
+  if (v.sortOrder !== undefined) { sets.push('sort_order = ?'); params.push(v.sortOrder); }
+  if (!sets.length) return false;
+  params.push(id);
+  const [result] = await pool.query(`UPDATE service_groups SET ${sets.join(', ')} WHERE id = ?`, params);
+  if (v.label !== undefined) await pool.query('UPDATE services SET route = ? WHERE group_id = ?', [v.label, id]);
+  return result.affectedRows > 0;
+}
+
+// A group that still has services cannot be deleted. Move or delete those services first.
+async function deleteGroup(id) {
+  const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM services WHERE group_id = ?', [id]);
+  if (c.n > 0) return { ok: false, reason: 'services' };
+  await pool.query('DELETE FROM translations WHERE item_key = ?', [catalog.keys.groupLabel(id)]);
+  await pool.query('DELETE FROM service_groups WHERE id = ?', [id]);
+  return { ok: true };
+}
+
+async function listLanguages() {
+  const [rows] = await pool.query('SELECT code, name, enabled, sort_order FROM languages ORDER BY sort_order, name');
+  return rows.map((l) => ({ code: l.code, name: l.name, enabled: !!l.enabled }));
+}
+
+async function createLanguage(v) {
+  const [[max]] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) AS m FROM languages');
+  await pool.query('INSERT INTO languages (code, name, enabled, sort_order) VALUES (?, ?, ?, ?)', [v.code, v.name, v.enabled === false ? 0 : 1, Number(max.m) + 1]);
+}
+
+async function updateLanguage(code, v) {
+  const sets = [];
+  const params = [];
+  if (v.name !== undefined) { sets.push('name = ?'); params.push(v.name); }
+  if (v.enabled !== undefined) { sets.push('enabled = ?'); params.push(v.enabled ? 1 : 0); }
+  if (!sets.length) return false;
+  params.push(code);
+  const [result] = await pool.query(`UPDATE languages SET ${sets.join(', ')} WHERE code = ?`, params);
+  return result.affectedRows > 0;
+}
+
+// Removes a language and everything translated into it. English cannot be removed.
+async function deleteLanguage(code) {
+  if (code === 'en') return false;
+  await pool.query('DELETE FROM translations WHERE lang = ?', [code]);
+  const [result] = await pool.query('DELETE FROM languages WHERE code = ?', [code]);
+  return result.affectedRows > 0;
+}
+
+// Saves translations for one language. An empty text removes that translation, so English is used again.
+async function setTranslations(lang, changes) {
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === '') {
+      await pool.query('DELETE FROM translations WHERE lang = ? AND item_key = ?', [lang, key]);
+    } else {
+      await pool.query(
+        'INSERT INTO translations (lang, item_key, value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)',
+        [lang, key, value]
+      );
+    }
+  }
+}
+
+// Every item key that can be translated: service names and descriptions, group labels, and the kiosk wording.
+async function knownTranslationKeys() {
+  const [services] = await pool.query('SELECT code FROM services');
+  const [groups] = await pool.query('SELECT id FROM service_groups');
+  return [
+    ...services.flatMap((s) => [catalog.keys.serviceName(s.code), catalog.keys.serviceDescription(s.code)]),
+    ...groups.map((g) => catalog.keys.groupLabel(g.id)),
+    ...Object.keys(UI_STRINGS.en).map((k) => catalog.keys.ui(k)),
+  ];
+}
+
 
 // Whether one service is open right now, with the database row (not the API shape). Used to
 // reject check-ins server-side, not just hide the tile client-side.
@@ -138,7 +429,7 @@ async function getServiceAvailability(code) {
   const [[svc]] = await pool.query('SELECT * FROM services WHERE code = ? AND active = 1', [code]);
   if (!svc) return null;
   const [schedules] = await pool.query('SELECT * FROM service_schedules WHERE service_code = ? AND active = 1', [code]);
-  return resolveAvailability(svc, schedules);
+  return { ...resolveAvailability(svc, schedules), asksAppointment: !!svc.asks_appointment };
 }
 
 async function createTicket(serviceCode, customerName, appointment) {
@@ -198,7 +489,7 @@ async function createTicket(serviceCode, customerName, appointment) {
 // Today's waiting and called tickets, grouped by service. Used by the monitor and queue portal.
 async function queueSnapshot() {
   const [services] = await pool.query(
-    'SELECT code, name, route FROM services WHERE active = 1 ORDER BY sort_order, name'
+    'SELECT code, name, description, icon, color, group_id, route, asks_appointment, pinned FROM services WHERE active = 1 ORDER BY ' + SERVICE_ORDER
   );
   const [rows] = await pool.query(
     `SELECT * FROM tickets
@@ -212,7 +503,13 @@ async function queueSnapshot() {
     return {
       code: s.code,
       name: s.name,
+      description: s.description || '',
+      icon: s.icon,
+      color: s.color,
+      groupId: s.group_id,
       route: s.route,
+      asksAppointment: !!s.asks_appointment,
+      pinned: !!s.pinned,
       available: avail[s.code] ? avail[s.code].available : true,
       unavailableMessage: avail[s.code] && !avail[s.code].available ? avail[s.code].message : null,
       waiting: mine.filter((t) => t.status === 'waiting'),
@@ -402,9 +699,9 @@ async function cleanupOldTickets(days, action) {
 // ---- Database check ----
 // The tables and columns the app depends on. A missing one usually means an upload was incomplete
 // or the database user lacked the privileges to create it on startup.
-const REQUIRED_TABLES = ['services', 'service_counters', 'tickets', 'service_schedules', 'users', 'audit_log', 'app_settings'];
+const REQUIRED_TABLES = ['services', 'service_counters', 'tickets', 'service_schedules', 'users', 'audit_log', 'app_settings', 'service_groups', 'languages', 'translations'];
 const REQUIRED_COLUMNS = {
-  services: ['code', 'name', 'manual_override', 'manual_override_expires_at'],
+  services: ['code', 'name', 'manual_override', 'manual_override_expires_at', 'description', 'icon', 'color', 'group_id', 'kiosk_row', 'asks_appointment', 'pinned'],
   tickets: ['service_code', 'status', 'created_at', 'called_by', 'completed_at'],
   users: ['username', 'display_name', 'password_hash', 'role', 'active', 'must_change_password', 'default_queues', 'last_login_at'],
   audit_log: ['created_at', 'actor_name', 'action'],
@@ -660,7 +957,10 @@ async function setManualOverride(serviceCode, override, message, expiresAt) {
 // Full detail for the Manage Services page: every active service with its current status,
 // override state, and its schedules.
 async function listServicesAdmin() {
-  const [services] = await pool.query('SELECT * FROM services WHERE active = 1 ORDER BY sort_order, name');
+  const [services] = await pool.query('SELECT * FROM services WHERE active = 1 ORDER BY ' + SERVICE_ORDER);
+  const [groups] = await pool.query('SELECT id, label FROM service_groups');
+  const groupLabels = {};
+  groups.forEach((g) => { groupLabels[g.id] = g.label; });
   const [schedules] = await pool.query('SELECT * FROM service_schedules ORDER BY weekday, start_time');
   const now = new Date();
   return services.map((s) => {
@@ -670,6 +970,8 @@ async function listServicesAdmin() {
       code: s.code,
       name: s.name,
       route: s.route,
+      groupId: s.group_id,
+      groupLabel: s.group_id ? groupLabels[s.group_id] || null : null,
       manualOverride: s.manual_override,
       manualMessage: s.manual_message,
       manualOverrideExpiresAt: s.manual_override_expires_at,
@@ -685,6 +987,10 @@ module.exports = {
   init, listServices, createTicket, queueSnapshot, callNext, updateTicket, transferTicket, completedToday, ticketsForRange,
   countActiveAdmins, findUserByUsername, getUser, listUsers, createUser, updateUser, deleteUser, touchLastLogin,
   getServiceAvailability, listSchedules, createSchedule, updateSchedule, deleteSchedule, setManualOverride, listServicesAdmin,
-  findActiveSchedule,
+  findActiveSchedule, isDefaultServiceStatement,
+  listCatalogServices, createService, updateService, deleteService, setLayout,
+  listGroups, createGroup, updateGroup, deleteGroup,
+  listLanguages, createLanguage, updateLanguage, deleteLanguage,
+  getTranslations, setTranslations, knownTranslationKeys,
   logAudit, listAudit, countRecentLoginFailures, cleanupAudit, closeOpenTickets, getSettings, setSetting, cleanupOldTickets, healthSnapshot, databaseCheck, splitStatements,
 };

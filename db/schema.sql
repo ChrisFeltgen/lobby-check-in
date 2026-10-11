@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   CONSTRAINT fk_tickets_service FOREIGN KEY (service_code) REFERENCES services (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO services (code, name, route, sort_order, active) VALUES
+INSERT IGNORE INTO services (code, name, route, sort_order, active) VALUES
   ('BPI', 'Building Permits & Inspections', 'Building Dept.', 1, 1),
   ('BSC', 'Building Safety Compliance', 'Building Dept.', 5, 1),
   ('CR', 'Contractor Registration', 'Building Dept.', 6, 1),
@@ -41,7 +41,7 @@ INSERT INTO services (code, name, route, sort_order, active) VALUES
   ('ZD', 'Zoning', 'Planning & Zoning', 4, 1),
   ('AB', 'Alarm Billing', 'Records & Alarms', 9, 1),
   ('AC', 'Appointment Check-In', 'Appointment Questions', 10, 1)
-ON DUPLICATE KEY UPDATE name = VALUES(name), route = VALUES(route), sort_order = VALUES(sort_order), active = VALUES(active);
+;
 
 -- Services that are no longer offered. Kept as rows so existing tickets still reference them.
 UPDATE services SET active = 0 WHERE code IN ('PRM', 'LIC', 'UTL', 'CSH', 'PZ');
@@ -96,3 +96,29 @@ CREATE TABLE IF NOT EXISTS app_settings (
 INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
   ('retention_days', '0'),
   ('retention_action', 'anonymize');
+
+-- Department groups: the card the monitor draws for the services in them.
+CREATE TABLE IF NOT EXISTS service_groups (
+  id VARCHAR(40) NOT NULL PRIMARY KEY,
+  label VARCHAR(100) NOT NULL,
+  icon VARCHAR(40) NULL,
+  color VARCHAR(7) NULL,
+  sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Languages the kiosk can offer. English is always there and cannot be turned off.
+CREATE TABLE IF NOT EXISTS languages (
+  code VARCHAR(10) NOT NULL PRIMARY KEY,
+  name VARCHAR(50) NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Translated text, one row per language and item. Item keys: service name, service description,
+-- group label, and kiosk wording (the ui prefix).
+CREATE TABLE IF NOT EXISTS translations (
+  lang VARCHAR(10) NOT NULL,
+  item_key VARCHAR(160) NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (lang, item_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -141,7 +141,7 @@ These settings are kept on the host, not in the files you uploaded.
 6. Create an account for each real staff member (**Add an account**). Leave **Require user to change password on next sign-on** ticked, so each person picks their own password when they first sign in.
 7. Change the admin password on **My account** (top right), or delete the two `ADMIN_` settings in step 5 and restart the app.
 
-**Check:** you can see the Services, Staff, Reports and Settings tabs.
+**Check:** you can see the Open & close, Staff, Reports and Settings tabs.
 
 ---
 

@@ -82,10 +82,40 @@ const mockDb = {
   ],
   listServicesAdmin: async () => [],
   listSchedules: async () => [],
-  queueSnapshot: async () => [
-    { code: 'BPI', name: 'Building Permits & Inspections', route: null, available: true, unavailableMessage: null, waiting: [], serving: [] },
+  listGroups: async () => [
+    { id: 'building', label: 'Building Dept.', englishLabel: 'Building Dept.', icon: 'building', color: '#2f6fd6', sortOrder: 1, codes: ['BPI'] },
   ],
-  getServiceAvailability: async () => ({ available: true, message: null }),
+  listLanguages: async () => [
+    { code: 'en', name: 'English', enabled: true },
+    { code: 'es', name: 'Español', enabled: true },
+  ],
+  listCatalogServices: async () => [
+    { code: 'BPI', name: 'Building Permits & Inspections', description: 'Permits', icon: 'building', color: null, route: 'Building Dept.', groupId: 'building', active: true, sortOrder: 1, hasTickets: false },
+  ],
+  getTranslations: async () => ({}),
+  setTranslations: async () => {},
+  knownTranslationKeys: async () => ['service.BPI.name', 'service.BPI.description', 'group.building.label', 'ui.btn_join'],
+  createService: async () => {},
+  updateService: async () => true,
+  // A service with customers on record cannot be deleted, as in the real database
+  deleteService: async (code) => (code === 'BPI' ? { ok: false, reason: 'tickets' } : { ok: true }),
+  createGroup: async () => {},
+  updateGroup: async () => true,
+  deleteGroup: async () => ({ ok: true }),
+  setLayout: async () => {},
+  ticketsForRange: async () => [],
+  createLanguage: async () => {},
+  updateLanguage: async () => true,
+  deleteLanguage: async () => true,
+  queueSnapshot: async () => [
+    {
+      code: 'BPI', name: 'Building Permits & Inspections', route: null, available: true, unavailableMessage: null,
+      waiting: [{ id: 7, serviceCode: 'BPI', customerName: 'Jane Smith', ticketNumber: 'BPI-007', status: 'waiting', appointmentWith: 'Lee Chen', appointmentTime: '9:30 AM', calledBy: null }],
+      serving: [{ id: 8, serviceCode: 'BPI', customerName: 'Ana Maria Ruiz', ticketNumber: 'BPI-008', status: 'serving', counter: '2', calledBy: 'Sam Staff', appointmentWith: null }],
+    },
+  ],
+  // ZD stands in for an appointment service, which asks who the visitor is seeing and the time
+  getServiceAvailability: async (code) => ({ available: true, message: null, asksAppointment: code === 'ZD' }),
   createTicket: async (serviceCode, name) => {
     const t = { id: tickets.length + 1, serviceCode, customerName: name, status: 'waiting' };
     tickets.push(t);
@@ -296,6 +326,26 @@ test('the queue data the monitor reads is available to the public', async () => 
   assert.equal(r.json[0].code, 'BPI');
 });
 
+test('the public queue shows customers as first name and last initial, and nothing about their appointment', async () => {
+  const r = await req('GET', '/api/queue');
+  const waiting = r.json[0].waiting[0];
+  const serving = r.json[0].serving[0];
+  assert.equal(waiting.customerName, 'Jane S.');
+  assert.equal(serving.customerName, 'Ana R.');
+  assert.equal(serving.calledBy, 'Sam Staff', 'the monitor says who will be with you');
+  assert.ok(!('appointmentWith' in waiting) && !('appointmentTime' in waiting), 'appointment details stay private');
+  assert.ok(!r.text.includes('Jane Smith') && !r.text.includes('Lee Chen'));
+});
+
+test('signed-in staff get the full queue, and the public cannot', async () => {
+  assert.equal((await req('GET', '/api/staff/queue')).status, 401);
+  const staff = await adminSession();
+  const r = await req('GET', '/api/staff/queue', { cookie: staff });
+  assert.equal(r.status, 200);
+  assert.equal(r.json[0].waiting[0].customerName, 'Jane Smith');
+  assert.equal(r.json[0].waiting[0].appointmentWith, 'Lee Chen');
+});
+
 // ---- logo ----
 
 const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -381,4 +431,157 @@ test('the end-of-day close runs once a day, closes open tickets, and records how
   assert.equal(openTicketsToClose, 5);
   assert.equal(audit.filter((a) => a.action === 'tickets.auto_close').length, 1);
   await req('PUT', '/api/admin/app-settings', { cookie: admin, body: { auto_close_time: '' } });
+});
+
+// ---- services, groups, languages and translations ----
+
+test('the public catalogue lists department groups and the languages switched on', async () => {
+  const r = await req('GET', '/api/catalog');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.groups[0].id, 'building');
+  assert.ok(r.json.languages.some((l) => l.code === 'en'));
+});
+
+test('the kiosk wording falls back to English for a language that is not set up', async () => {
+  const r = await req('GET', '/api/i18n/fr');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.lang, 'en');
+  assert.equal(r.json.strings.brand, 'Check In');
+});
+
+test('services can be requested in a language', async () => {
+  const r = await req('GET', '/api/services?lang=es');
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json));
+});
+
+test('an admin can add a service, and a code that is not valid is refused', async () => {
+  const admin = await adminSession();
+  let r = await req('POST', '/api/admin/services', { cookie: admin, body: { code: 'x', name: 'Bad' } });
+  assert.equal(r.status, 400);
+  r = await req('POST', '/api/admin/services', { cookie: admin, body: { code: 'PRM', name: 'Permits', icon: 'building' } });
+  assert.equal(r.status, 201);
+});
+
+test('a service with customers on record cannot be deleted, and one without can', async () => {
+  const admin = await adminSession();
+  let r = await req('DELETE', '/api/admin/services/BPI', { cookie: admin });
+  assert.equal(r.status, 409);
+  assert.match(r.json.error, /Turn it off instead/);
+  r = await req('DELETE', '/api/admin/services/ZD', { cookie: admin });
+  assert.equal(r.status, 200);
+});
+
+test('English cannot be turned off, and translations must match known items', async () => {
+  const admin = await adminSession();
+  let r = await req('PATCH', '/api/admin/languages/en', { cookie: admin, body: { enabled: false } });
+  assert.equal(r.status, 400);
+  r = await req('PUT', '/api/admin/translations', { cookie: admin, body: { lang: 'es', values: { 'service.XX.name': 'Nope' } } });
+  assert.equal(r.status, 400);
+  r = await req('PUT', '/api/admin/translations', { cookie: admin, body: { lang: 'es', values: { 'ui.btn_join': 'Unirse' } } });
+  assert.equal(r.status, 200);
+});
+
+test('managers cannot use the Services & languages admin routes', async () => {
+  const mgr = (await signIn('mgr', 'ResetPass123')).cookie;
+  assert.equal((await req('GET', '/api/admin/catalog', { cookie: mgr })).status, 403);
+  assert.equal((await req('POST', '/api/admin/groups', { cookie: mgr, body: { id: 'permits', label: 'Permits' } })).status, 403);
+});
+
+test('a group id that is not valid is refused', async () => {
+  const admin = await adminSession();
+  const r = await req('POST', '/api/admin/groups', { cookie: admin, body: { id: 'Bad Id', label: 'Permits' } });
+  assert.equal(r.status, 400);
+});
+
+test('deleting a department group that does not exist is a 404, and a group can be given an order', async () => {
+  const admin = await adminSession();
+  let r = await req('DELETE', '/api/admin/groups/nowhere', { cookie: admin });
+  assert.equal(r.status, 404);
+  r = await req('PATCH', '/api/admin/groups/building', { cookie: admin, body: { sortOrder: 3 } });
+  assert.equal(r.status, 200);
+  r = await req('PATCH', '/api/admin/groups/building', { cookie: admin, body: { sortOrder: '' } });
+  assert.equal(r.status, 400);
+});
+
+test('an admin can move a service to a row, and a row that is not valid is refused', async () => {
+  const admin = await adminSession();
+  let r = await req('PATCH', '/api/admin/services/BPI', { cookie: admin, body: { row: 2, sortOrder: 1 } });
+  assert.equal(r.status, 200);
+  r = await req('PATCH', '/api/admin/services/BPI', { cookie: admin, body: { row: 0 } });
+  assert.equal(r.status, 400);
+  r = await req('POST', '/api/admin/services', { cookie: admin, body: { code: 'ROWY', name: 'Row test', row: 99 } });
+  assert.equal(r.status, 400);
+});
+
+test('an admin can save the kiosk layout, but it must list every service that is on exactly once', async () => {
+  const admin = await adminSession();
+  let r = await req('PUT', '/api/admin/layout', { cookie: admin, body: { rows: [['BPI']] } });
+  assert.equal(r.status, 200);
+  r = await req('PUT', '/api/admin/layout', { cookie: admin, body: { rows: [[], ['BPI'], []] } });
+  assert.equal(r.status, 200, 'empty rows are dropped');
+  r = await req('PUT', '/api/admin/layout', { cookie: admin, body: { rows: [['BPI', 'NOPE']] } });
+  assert.equal(r.status, 400);
+  r = await req('PUT', '/api/admin/layout', { cookie: admin, body: { rows: [] } });
+  assert.equal(r.status, 400, 'a layout that leaves a service out is refused');
+  r = await req('PUT', '/api/admin/layout', { cookie: admin, body: { rows: [['BPI'], ['BPI']] } });
+  assert.equal(r.status, 400);
+  const mgr = (await signIn('mgr', 'ResetPass123')).cookie;
+  assert.equal((await req('PUT', '/api/admin/layout', { cookie: mgr, body: { rows: [['BPI']] } })).status, 403);
+});
+
+test('a service set to ask for an appointment needs who and when; one that is not needs neither', async () => {
+  let r = await req('POST', '/api/tickets', { body: { serviceId: 'BPI', name: 'Pat' } });
+  assert.equal(r.status, 201);
+  r = await req('POST', '/api/tickets', { body: { serviceId: 'ZD', name: 'Pat' } });
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /who you are here to see/);
+  r = await req('POST', '/api/tickets', { body: { serviceId: 'ZD', name: 'Pat', appointment: { with: 'Lee', time: '99:99' } } });
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /appointment time/);
+  r = await req('POST', '/api/tickets', { body: { serviceId: 'ZD', name: 'Pat', appointment: { with: 'Lee', time: '9:30 AM' } } });
+  assert.equal(r.status, 201);
+});
+
+test('an admin can switch the appointment and pinned behaviours on a service, and only with yes or no', async () => {
+  const admin = await adminSession();
+  let r = await req('PATCH', '/api/admin/services/BPI', { cookie: admin, body: { asksAppointment: true, pinned: true } });
+  assert.equal(r.status, 200);
+  r = await req('PATCH', '/api/admin/services/BPI', { cookie: admin, body: { pinned: 'yes' } });
+  assert.equal(r.status, 400);
+  r = await req('POST', '/api/admin/services', { cookie: admin, body: { code: 'APPT2', name: 'Inspection', asksAppointment: true } });
+  assert.equal(r.status, 201);
+});
+
+test('a report comes with the names of every service, including ones turned off', async () => {
+  const admin = await adminSession();
+  const r = await req('GET', '/api/reports/range?from=2026-01-01&to=2026-01-02', { cookie: admin });
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json.services) && r.json.services.some((s) => s.code === 'BPI' && s.name));
+});
+
+test('deleting a service or a group takes it out of the monitor panels, and an empty panel goes back to its default', async () => {
+  const admin = await adminSession();
+  let r = await req('PUT', '/api/admin/app-settings', { cookie: admin, body: { monitor_left: ['building', 'ZD'] } });
+  assert.equal(r.status, 200);
+  r = await req('DELETE', '/api/admin/services/ZD', { cookie: admin });
+  assert.equal(r.status, 200);
+  r = await req('GET', '/api/admin/app-settings', { cookie: admin });
+  assert.deepEqual(r.json.values.monitor_left, ['building']);
+  r = await req('DELETE', '/api/admin/groups/building', { cookie: admin });
+  assert.equal(r.status, 200);
+  r = await req('GET', '/api/admin/app-settings', { cookie: admin });
+  assert.deepEqual(r.json.values.monitor_left, ['planning', 'CE', 'BTD'], 'an empty panel returns to its default');
+});
+
+test('an admin can delete a language other than English, and English cannot be deleted', async () => {
+  const admin = await adminSession();
+  let r = await req('DELETE', '/api/admin/languages/en', { cookie: admin });
+  assert.equal(r.status, 400);
+  r = await req('DELETE', '/api/admin/languages/xx', { cookie: admin });
+  assert.equal(r.status, 404);
+  r = await req('DELETE', '/api/admin/languages/es', { cookie: admin });
+  assert.equal(r.status, 200);
+  const mgr = (await signIn('mgr', 'ResetPass123')).cookie;
+  assert.equal((await req('DELETE', '/api/admin/languages/es', { cookie: mgr })).status, 403);
 });

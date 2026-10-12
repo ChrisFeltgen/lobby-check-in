@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const reports = require('../reports');
+const reports = require('../lib/reports');
 
 test('only real calendar dates are accepted', () => {
   assert.equal(reports.isCalendarDate('2026-10-09'), true);

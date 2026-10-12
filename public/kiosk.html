@@ -8,7 +8,7 @@
   <style>
     /* Palette from the City of Pompano Beach website: light gray page, white cards, teal headings,
        cyan accents. The header is always the deep blue bar. The colour scheme (light or dark) is set
-       in Management → Settings → Kiosk colours. */
+       in Management → Settings → Kiosk configuration. */
     body.kiosk {
       --k-bg: #eef4f9;
       --k-text: #0b2a4a;
@@ -28,7 +28,7 @@
       background: var(--k-bg);
       color: var(--k-text);
     }
-    /* Dark palette, used when Settings → Kiosk colours is set to dark. */
+    /* Dark palette, used when Settings → Kiosk configuration is set to dark. */
     html[data-theme="dark"] body.kiosk {
       --k-bg: #12161c;
       --k-text: #e8ecf1;
@@ -98,6 +98,10 @@
     .welcome-title { margin: 0; font-size: clamp(52px, 7vmin, 80px); white-space: nowrap; font-weight: 600; line-height: 1.1; color: var(--k-accent); }
     .welcome-title-es { margin: -8px 0 6px; font-size: clamp(34px, 4.6vmin, 50px); color: var(--k-muted); }
     .welcome-sub { margin: 0; font-size: clamp(30px, 4vmin, 40px); font-weight: 700; color: var(--k-text); }
+    /* The same line in each other language that is on, under the English one. */
+    .welcome-sub-other { margin: 0; font-size: clamp(24px, 3.2vmin, 32px); font-weight: 600; color: var(--k-muted); }
+    #choose-others { display: flex; flex-direction: column; gap: 4px; margin-top: -12px; }
+    #welcome-others:empty, #choose-others:empty { display: none; }
     .lang-buttons { display: flex; flex-direction: column; gap: 16px; width: 100%; max-width: 560px; }
     .lang-btn {
       min-height: clamp(70px, 8vmin, 96px);
@@ -302,8 +306,11 @@
     .offline h2 { margin: 6px 0 0; font-size: clamp(36px, 6vmin, 64px); font-weight: 700; color: var(--k-accent); }
     .offline p { margin: 0; font-size: clamp(24px, 3.4vmin, 36px); line-height: 1.35; }
     .offline .offline-line { display: block; white-space: nowrap; }
-    .offline .offline-es { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--k-border); width: 100%; }
-    .offline .offline-es h2 { font-size: clamp(30px, 4.8vmin, 50px); margin-top: 0; }
+    /* One block per language: the first is the largest, and each after it is set off by a line. */
+    .offline .offline-langs { width: 100%; display: flex; flex-direction: column; align-items: center; }
+    .offline .offline-lang { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .offline .offline-lang + .offline-lang { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--k-border); }
+    .offline .offline-lang + .offline-lang h2 { font-size: clamp(30px, 4.8vmin, 50px); margin-top: 0; }
     .offline .offline-retry { margin-top: 22px; font-size: clamp(18px, 2.4vmin, 24px); color: var(--k-muted); }
     .offline .offline-retry::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 10px; border-radius: 50%; background: var(--k-accent); animation: offlinePulse 1.4s ease-in-out infinite; }
     @keyframes offlinePulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
@@ -319,7 +326,7 @@
 <body class="kiosk">
   <header class="top">
     <div class="brand">
-      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.style.display='none'"></span>
       <span class="divider"></span>
       <h1 data-i18n="brand">Check In</h1>
     </div>
@@ -334,7 +341,8 @@
       <div class="welcome-card">
         <h2 class="welcome-title">Welcome - Please Check In Here</h2>
         <div id="welcome-others"></div>
-        <p class="welcome-sub">Select a Language:</p>
+        <p class="welcome-sub" id="choose-title">Select a Language:</p>
+        <div id="choose-others"></div>
         <div class="lang-buttons" id="lang-buttons"></div>
       </div>
     </section>
@@ -419,17 +427,24 @@
   <div id="offline" class="offline hidden" role="alert" aria-live="assertive">
     <div class="offline-card">
       <div class="offline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2-1.5"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 10.4 4.1"/><path d="m2 2 20 20"/></svg></div>
-      <h2>Kiosk unavailable</h2>
-      <p>Sorry, check-in is not working right now.<span class="offline-line">Please see a staff member for help.</span></p>
-      <div class="offline-es">
-        <h2>Quiosco no disponible</h2>
-        <p>Lo sentimos, el registro no funciona en este momento.<span class="offline-line">Por favor, pida ayuda al personal.</span></p>
+      <!-- English and Spanish are written in here, for a kiosk that was started while the server was down and so has no
+           wording yet. Once the wording is read, renderOffline draws one block per language that is on. -->
+      <div class="offline-langs" id="offline-langs">
+        <div class="offline-lang" lang="en">
+          <h2>Kiosk unavailable</h2>
+          <p>Sorry, check-in is not working right now.<span class="offline-line">Please see a staff member for help.</span></p>
+        </div>
+        <div class="offline-lang" lang="es">
+          <h2>Quiosco no disponible</h2>
+          <p>Lo sentimos, el registro no funciona en este momento.<span class="offline-line">Por favor, pida ayuda al personal.</span></p>
+        </div>
       </div>
       <p class="offline-retry">Trying to reconnect&hellip;</p>
     </div>
   </div>
 
   <script src="socket.io/socket.io.js"></script>
+  <script src="access.js" data-screen="kiosk"></script>
   <script src="app-settings.js"></script>
   <script src="icons.js"></script>
   <script>
@@ -446,7 +461,7 @@
         var h = Math.floor(mins / 60), m = mins % 60;
         TIME_SLOTS.push(((h + 11) % 12 + 1) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'));
       }
-      // Set from Management → Settings → Kiosk before the first screen is shown (see the end of this script).
+      // Set from Management → Settings → Kiosk configuration before the first screen is shown (see the end of this script).
       var IDLE_MS, DONE_MS;
 
       var LANG = 'en';
@@ -462,7 +477,7 @@
       var busy = false;
       var lastAhead = 0;
 
-      // All kiosk text comes from the server, in the chosen language (see Services & languages).
+      // All kiosk text comes from the server, in the chosen language (see Service Configuration).
       // T[language] holds the wording for that language, loaded when the language is chosen.
       var T = {};
       var languages = [];    // the languages switched on for the kiosk, from /api/catalog
@@ -498,6 +513,12 @@
 
       function t(key) {
         return (T[LANG] && T[LANG][key]) || (T.en && T.en[key]) || key;
+      }
+
+      // Like t, for wording an older copy of the server may not have yet: the fallback is used when there is none.
+      function tOr(key, fallback) {
+        var text = t(key);
+        return text === key ? fallback : text;
       }
 
       // Service names and descriptions arrive already translated (see loadServices).
@@ -761,7 +782,7 @@
       }
 
       // Builds the service cards in the current language, in 4-3-3 rows.
-      // The tiles go in the rows chosen in Services & languages: services with the same row number share a row,
+      // The tiles go in the rows chosen in Service Configuration: services with the same row number share a row,
       // and the list already arrives in order within it. A service with no row yet goes on a row of its own at the end.
       function renderServices() {
         var tiles = $('tiles');
@@ -797,9 +818,41 @@
       var failedChecks = 0;
       var offline = false;
 
+      // The "kiosk unavailable" message, one block per language that is on, drawn from the wording already read, since
+      // nothing can be fetched while the server is down. A language with no translation of it is left out, because the
+      // English would only repeat. Until the wording has been read (a kiosk that was started during an outage), the
+      // English and Spanish written into the page stay as they are.
+      function renderOffline() {
+        if (!T.en || !T.en.offline_title) return;
+        var codes = languages.length ? languages.map(function (l) { return l.code; }) : Object.keys(T);
+        codes = ['en'].concat(codes.filter(function (c) { return c !== 'en'; }));
+        var box = $('offline-langs');
+        box.textContent = '';
+        codes.forEach(function (code) {
+          var s = T[code];
+          if (!s || !s.offline_title) return;
+          if (code !== 'en' && s.offline_title === T.en.offline_title) return;
+          var block = document.createElement('div');
+          block.className = 'offline-lang';
+          block.lang = code;
+          var title = document.createElement('h2');
+          title.textContent = s.offline_title;
+          var message = document.createElement('p');
+          message.appendChild(document.createTextNode(s.offline_message));
+          var help = document.createElement('span');
+          help.className = 'offline-line';
+          help.textContent = s.offline_help;
+          message.appendChild(help);
+          block.appendChild(title);
+          block.appendChild(message);
+          box.appendChild(block);
+        });
+      }
+
       function showOffline() {
         offline = true;
         clearTimeout(resetTimer);
+        renderOffline();
         $('offline').classList.remove('hidden');
       }
 
@@ -913,20 +966,33 @@
         }
       }
 
-      // The greeting under the English one: the welcome line in each other language that is on, so the screen
-      // never greets in a language that has been switched off. A language with no translation of it adds nothing.
+      // The greeting and the "select a language" line under the English ones: each in every other language that is on,
+      // so the screen never speaks a language that has been switched off. A language with no translation of a line
+      // adds nothing for it.
       function renderWelcome() {
-        var box = $('welcome-others');
-        box.textContent = '';
-        var english = (T.en || {}).welcome_title;
+        var greetings = $('welcome-others');
+        greetings.textContent = '';
+        var prompts = $('choose-others');
+        prompts.textContent = '';
+        var english = T.en || {};
+        if (english.choose_language) $('choose-title').textContent = english.choose_language;
         languages.forEach(function (l) {
           if (l.code === 'en') return;
-          var text = (T[l.code] || {}).welcome_title;
-          if (!text || text === english) return;
-          var p = document.createElement('p');
-          p.className = 'welcome-title-es';
-          p.textContent = text;
-          box.appendChild(p);
+          var strings = T[l.code] || {};
+          if (strings.welcome_title && strings.welcome_title !== english.welcome_title) {
+            var greeting = document.createElement('p');
+            greeting.className = 'welcome-title-es';
+            greeting.lang = l.code;
+            greeting.textContent = strings.welcome_title;
+            greetings.appendChild(greeting);
+          }
+          if (strings.choose_language && strings.choose_language !== english.choose_language) {
+            var prompt = document.createElement('p');
+            prompt.className = 'welcome-sub-other';
+            prompt.lang = l.code;
+            prompt.textContent = strings.choose_language;
+            prompts.appendChild(prompt);
+          }
         });
       }
 
@@ -1052,10 +1118,20 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
           });
-          var data = await res.json().catch(function () { return {}; });
-          // Shows the server's own message when there is one (e.g. why a service just closed),
-          // since those are specific and worth seeing; falls back to the generic message otherwise.
-          if (!res.ok) throw new Error(data.error || t('err_generic'));
+          var parsed = true;
+          var data = await res.json().catch(function () { parsed = false; return {}; });
+          // The web server answering instead of the app (its own 404 or error page) means the app is not running.
+          if (!res.ok && !parsed && (res.status === 404 || res.status >= 500)) {
+            failedChecks = OFFLINE_AFTER - 1;
+            noteConnection(false);
+          }
+          // Why a check-in was refused is said in the customer's language. The one message taken from the server as it
+          // is, is the reason a service has just closed: staff write that, and it says something specific.
+          if (!res.ok) {
+            var refusal = new Error('check-in refused');
+            refusal.userMessage = res.status === 429 ? tOr('err_rate', t('err_generic')) : res.status === 409 && data.error ? data.error : t('err_generic');
+            throw refusal;
+          }
           $('done-name').textContent = data.customerName;
           lastAhead = data.peopleAhead;
           $('done-ahead').textContent = doneAhead(lastAhead);
@@ -1068,7 +1144,8 @@
             noteConnection(false);
           }
           var onTimeStep = !$('step-time').classList.contains('hidden');
-          $(onTimeStep ? 'time-error' : 'name-error').textContent = err.message;
+          // Never the browser's own wording ("Failed to fetch"): it is English, and means nothing to a customer.
+          $(onTimeStep ? 'time-error' : 'name-error').textContent = err.userMessage || t('err_generic');
         } finally {
           busy = false;
           $('submit').disabled = false;
@@ -1097,6 +1174,11 @@
       // Physical keyboard support, for a kiosk with one attached.
       document.addEventListener('keydown', function (e) {
         if (offline || $('step-name').classList.contains('hidden')) return;
+        // A shortcut such as Ctrl+R is not typing a name.
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        // Typing on a physical keyboard is activity, like touching a key on the screen: without this the kiosk would
+        // start over from the welcome screen part way through a name typed this way.
+        scheduleReset(IDLE_MS);
         if (e.key === 'Enter') { next(); e.preventDefault(); return; }
         if (e.key === 'Backspace') { name = name.slice(0, -1); renderName(); e.preventDefault(); return; }
         if (/^[A-Za-z]$/.test(e.key)) { letter(e.key); return; }
@@ -1118,10 +1200,18 @@
           refreshServices(true).catch(function () {});
           loadStrings(LANG).then(applyLanguage).catch(function () {}).then(greetInEveryLanguage);
         });
+        // A screen that is locked (see access.js) is refused the live connection, and stops asking for it. It asks again
+        // once it has been let in.
+        socket.on('connect_error', function (err) {
+          if (err && err.message === 'locked') { socket.disconnect(); if (window.screenAccess) window.screenAccess.refused(); }
+        });
+        (window.screenAccessReady || Promise.resolve()).then(function () { if (!socket.connected) socket.connect(); });
       }
       // Checks every 15 seconds, and every 3 while the connection is in doubt, so the message goes away quickly.
       var pollTimer = null;
       function pollServer() {
+        // While the lock screen is up there is nothing to ask the server but whether it is open again, which access.js does.
+        if (window.screenAccess && window.screenAccess.locked) { pollTimer = setTimeout(pollServer, 5000); return; }
         refreshServices(true).catch(function () {}).then(function () {
           clearTimeout(pollTimer);
           pollTimer = setTimeout(pollServer, failedChecks || offline ? 3000 : 15000);
@@ -1132,7 +1222,8 @@
         clearTimeout(pollTimer);
         pollTimer = setTimeout(pollServer, 3000);
       }
-      pollTimer = setTimeout(pollServer, 15000);
+      // The first check comes soon after the page opens, so a kiosk started while the server is down says so within seconds.
+      pollTimer = setTimeout(pollServer, 2000);
       // The browser noticing the network come or go is a quicker signal than the next check.
       window.addEventListener('offline', function () { noteConnection(false); });
       window.addEventListener('online', function () { refreshServices(true).catch(function () {}); });
@@ -1143,7 +1234,9 @@
         IDLE_MS = s.kiosk_idle_seconds * 1000;
         DONE_MS = s.kiosk_done_seconds * 1000;
       }
-      window.appSettingsReady.then(function (s) {
+      // It also waits until the screen may open (see access.js), which is at once unless the screens are locked.
+      Promise.all([window.appSettingsReady, window.screenAccessReady]).then(function (ready) {
+        var s = ready[0];
         applyKioskSettings(s);
         window.watchAppSettings(applyKioskSettings);
         loadStrings(LANG)

@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const auth = require('../auth');
+const auth = require('../lib/auth');
 
 test('a password verifies against its own hash and nothing else', () => {
   const stored = auth.hashPassword('correct-horse');
@@ -64,4 +64,13 @@ test('cookie headers are parsed into name and value pairs', () => {
   assert.equal(cookies.vq_session, 'abc def');
   assert.equal(cookies.empty, '');
   assert.deepEqual(auth.parseCookies(undefined), {});
+});
+
+// Cookies from other sites and apps on the same domain are sent too. One with a stray % in it used to throw, which
+// failed every request to this app, pages included, for that browser.
+test('a cookie that is not valid percent-encoding does not break the others', () => {
+  const cookies = auth.parseCookies('other=100%; vq_session=abc%20def; broken=%E0%A4%A');
+  assert.equal(cookies.vq_session, 'abc def');
+  assert.equal(cookies.other, '100%');
+  assert.equal(cookies.broken, '%E0%A4%A');
 });

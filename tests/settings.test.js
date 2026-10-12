@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const s = require('../settings');
+const s = require('../lib/settings');
 
 test('missing or unusable stored values fall back to the defaults', () => {
   const values = s.parseSettings({ kiosk_idle_seconds: 'lots', monitor_chime: 'maybe', monitor_left: 'not json' });

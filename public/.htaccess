@@ -1,7 +1,8 @@
-# Ask browsers to re-check HTML pages on every visit, so an updated page is never replaced by an
-# older copy kept in the browser cache. Read by Apache-style hosts and LiteSpeed (scrapcraft.dev).
+# Ask browsers to re-check pages, scripts and styles on every visit, so an updated page is never replaced by an
+# older copy kept in the browser cache, and never runs against an older copy of a script it shares. A file that has
+# not changed is answered with a short "not modified". Read by Apache-style hosts and LiteSpeed (scrapcraft.dev).
 <IfModule mod_headers.c>
-  <FilesMatch "\.html$">
+  <FilesMatch "\.(html|js|css)$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 

@@ -7,12 +7,13 @@ const { execFile } = require('child_process');
 const express = require('express');
 const { Server } = require('socket.io');
 const db = require('./db');
-const auth = require('./auth');
-const reports = require('./reports');
-const appSettings = require('./settings');
-const catalog = require('./catalog');
-const privacy = require('./privacy');
-const { UI_STRINGS } = require('./ui-strings');
+const auth = require('./lib/auth');
+const reports = require('./lib/reports');
+const appSettings = require('./lib/settings');
+const catalog = require('./lib/catalog');
+const privacy = require('./lib/privacy');
+const screens = require('./lib/screens');
+const { UI_STRINGS } = require('./lib/ui-strings');
 
 const PORT = process.env.PORT || 3000;
 // Set BASE_PATH (e.g. /virtual-queue) when the app is served under a sub-path. Leave empty for a domain root.
@@ -36,13 +37,32 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'same-origin');
   next();
 });
-app.set('trust proxy', true); // so req.secure reflects the original request behind a reverse proxy
+// How far to trust the X-Forwarded-For and X-Forwarded-Proto headers a proxy adds, so req.secure and the address a
+// request came from reflect the original request behind a reverse proxy. Left unset, every hop is trusted, which works
+// behind any proxy but lets a visitor choose the address the check-in limit sees by sending that header themselves.
+// Set TRUST_PROXY=1 when exactly one proxy (the web server in front of the app) is in front: only the address that
+// proxy saw is then used. A larger number counts more proxies, "false" trusts none, and an address list is accepted too.
+function trustProxySetting(value) {
+  const text = String(value === undefined || value === null ? '' : value).trim();
+  const lower = text.toLowerCase();
+  if (lower === '' || lower === 'true') return true;
+  if (lower === 'false') return false;
+  if (/^\d+$/.test(text)) return Number(text);
+  return text;
+}
+app.set('trust proxy', trustProxySetting(process.env.TRUST_PROXY));
+// The address a request is for, without the sub-path the app is served under: "/virtual-queue/api/x?y" is
+// "/api/x?y", and "/virtual-queue?y" is "/?y". An address outside the sub-path is left as it is.
+function withoutBasePath(url, base) {
+  if (!base) return url;
+  if (url !== base && !url.startsWith(base + '/') && !url.startsWith(base + '?')) return url;
+  const rest = url.slice(base.length);
+  return rest.startsWith('/') ? rest : '/' + rest;
+}
 if (BASE_PATH) {
   // The host forwards the full path, so remove the prefix before routing.
   app.use((req, res, next) => {
-    if (req.url === BASE_PATH || req.url.startsWith(BASE_PATH + '/') || req.url.startsWith(BASE_PATH + '?')) {
-      req.url = req.url.slice(BASE_PATH.length) || '/';
-    }
+    req.url = withoutBasePath(req.url, BASE_PATH);
     next();
   });
 }
@@ -54,16 +74,27 @@ app.use((req, res, next) => {
   req.cookies = auth.parseCookies(req.headers.cookie);
   next();
 });
-// HTML pages must be re-checked on every navigation. Without this, a normal link click can reuse a
-// cached copy of an older page (e.g. manage.html without a newly added tab), and only a refresh shows the update.
+// Pages, scripts and styles must be re-checked on every use. Without this, a normal link click can reuse a cached
+// copy of an older page (e.g. manage.html without a newly added tab), and an updated page can run against an
+// older copy of a script it shares (icons.js, app-settings.js) kept by the browser. A file that has not changed is
+// answered with a short "not modified", so this costs almost nothing.
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders(res, filePath) {
-    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+    if (/\.(html|js|css)$/.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
   }
 }));
 
 const server = http.createServer(app);
 const io = new Server(server, { path: BASE_PATH + '/socket.io' });
+
+// The live connection carries no customer data, only "something changed". With the screens locked it is kept for what
+// may open them as well, so a stranger cannot sit on it. (A page that is refused falls back to asking now and then,
+// and shows its lock screen.)
+io.use((socket, next) => {
+  const req = { cookies: auth.parseCookies(socket.request.headers.cookie) };
+  const res = { setHeader() {}, append() {} }; // a live connection has no response to write a cookie to
+  screenAllowed(req, res, 'either').then((ok) => next(ok ? undefined : new Error('locked')), () => next(new Error('locked')));
+});
 
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
@@ -143,8 +174,76 @@ function requireRole(minRole) {
   });
 }
 
+// ---- Who may open the kiosk and the monitor ----
+// Normally anyone who has the address. With "Restrict access to signed-in users, or to screens opened with an access link" on (Settings),
+// a screen and the data behind it open only for a signed-in user, or for a browser holding the key of an access link of
+// the right kind (see screens.js). The pages show a lock screen when the server refuses them, but this check, on every
+// route they use, is what does the work: hiding a page would protect nothing while its data stayed open.
+
+const linkCache = new Map();     // key hash -> { link, at }, kept a few seconds so a screen's polling does not ask the database each time
+const LINK_CACHE_MS = 5000;
+const linkTouched = new Map();   // link id -> when its last-used time was last written
+const cookieRenewed = new Map(); // link id -> when a browser's cookie was last renewed
+
+// Called whenever a link is made, replaced, revoked or removed, so the change counts at once.
+function forgetLinks() {
+  linkCache.clear();
+  linkTouched.clear();
+  cookieRenewed.clear();
+}
+
+// The link a key opens, or null for a key that belongs to none or to a link that has been revoked.
+async function linkForKey(key) {
+  if (!screens.isKey(key)) return null;
+  const hash = screens.hashKey(key);
+  const hit = linkCache.get(hash);
+  if (hit && Date.now() - hit.at < LINK_CACHE_MS) return hit.link;
+  const row = await db.findScreenLink(hash);
+  // A wrong key or a revoked link is not remembered, so it is looked up again each time, which is cheap, and nothing
+  // a stranger sends can fill the cache.
+  if (!row || row.revokedAt) return null;
+  const link = { id: row.id, name: row.name, scope: row.scope };
+  linkCache.set(hash, { link, at: Date.now() });
+  // Written at most once a minute, so the list can show when a screen was last in use without a write on every poll.
+  if (Date.now() - (linkTouched.get(link.id) || 0) > 60000) {
+    linkTouched.set(link.id, Date.now());
+    db.touchScreenLink(link.id).catch(() => {});
+  }
+  return link;
+}
+
+function linkFromRequest(req) {
+  const key = req.cookies && req.cookies[screens.COOKIE];
+  return key ? linkForKey(key) : Promise.resolve(null);
+}
+
+// Whether a request, or a live connection (which has no response to write a cookie to), may use a screen of this kind.
+// `need` is 'kiosk', 'monitor', or 'either' for data both use. Always true while the setting is off.
+async function screenAllowed(req, res, need, settings) {
+  const s = settings || (await currentSettings());
+  if (!s.restrict_screens) return true;
+  const user = await loadSessionUser(req, res);
+  if (user && !user.mustChangePassword) return true;
+  const link = await linkFromRequest(req);
+  if (!link || !screens.scopeAllows(link.scope, need)) return false;
+  // A browser that is in use has its cookie renewed about once a day, so it never reaches the end of it.
+  if (Date.now() - (cookieRenewed.get(link.id) || 0) > 24 * 3600 * 1000) {
+    cookieRenewed.set(link.id, Date.now());
+    res.append('Set-Cookie', screens.cookie(req.cookies[screens.COOKIE], { path: cookiePath(), secure: req.secure }));
+  }
+  return true;
+}
+
+// For the routes a screen uses. 401 with a code the pages recognise, so they show the lock screen and not an error.
+function screenAccess(need) {
+  return wrap(async (req, res, next) => {
+    if (await screenAllowed(req, res, need)) return next();
+    res.status(401).json({ error: 'This screen needs a staff sign-in or its access link.', code: 'ACCESS_LOCKED' });
+  });
+}
+
 const SERVICE_CODE = /^[A-Z0-9]{1,10}$/;
-// A service that asks for an appointment (set in Services & languages) wants who the visitor is seeing and the
+// A service that asks for an appointment (set in Service Configuration) wants who the visitor is seeing and the
 // time they are booked for.
 const APPOINTMENT_TIME = /^(1[0-2]|0?[1-9]):[0-5][0-9] (AM|PM)$/;
 const TICKET_ACTIONS = ['call', 'complete', 'remove', 'return'];
@@ -164,19 +263,19 @@ async function departmentList() {
 }
 
 // Active services. With ?lang=, names and descriptions come in that language where translated.
-app.get('/api/services', wrap(async (req, res) => {
+app.get('/api/services', screenAccess('kiosk'), wrap(async (req, res) => {
   res.json(await db.listServices(await languageFor(String(req.query.lang || ''))));
 }));
 
-// Department groups and the languages the kiosk offers.
-app.get('/api/catalog', wrap(async (req, res) => {
+// Department groups and the languages the kiosk offers. The monitor reads the groups, so either kind of screen may.
+app.get('/api/catalog', screenAccess('either'), wrap(async (req, res) => {
   const lang = await languageFor(String(req.query.lang || ''));
   const languages = (await db.listLanguages()).filter((l) => l.enabled);
   res.json({ groups: await db.listGroups(lang), languages });
 }));
 
 // The kiosk's wording for one language. Anything not translated falls back to English.
-app.get('/api/i18n/:lang', wrap(async (req, res) => {
+app.get('/api/i18n/:lang', screenAccess('kiosk'), wrap(async (req, res) => {
   const lang = await languageFor(req.params.lang);
   const strings = { ...UI_STRINGS.en };
   if (lang !== 'en') {
@@ -189,15 +288,23 @@ app.get('/api/i18n/:lang', wrap(async (req, res) => {
   res.json({ lang, strings });
 }));
 
-// ---- Services & languages (admin): services, department groups, languages and translations ----
+// ---- Service Configuration (admin): services, department groups, languages and translations ----
 
 app.get('/api/admin/catalog', requireRole('admin'), wrap(async (req, res) => {
-  res.json({
-    services: await db.listCatalogServices(),
-    groups: await db.listGroups('en'),
-    languages: await db.listLanguages(),
-    iconNames: catalog.ICON_NAMES,
-  });
+  const services = await db.listCatalogServices();
+  const groups = await db.listGroups('en');
+  const languages = await db.listLanguages();
+  // What each language other than English still lacks, so the page can point at the services and wording that need
+  // translating. A language's count covers every active service, group and line of kiosk wording. A service lists the
+  // languages that are switched on and are missing its name or description, since only those show on the kiosk.
+  const active = services.filter((s) => s.active);
+  const others = languages.filter((l) => l.code !== 'en');
+  const saved = {};
+  for (const l of others) saved[l.code] = await db.getTranslations(l.code);
+  const gaps = catalog.serviceTranslationGaps(active, others.filter((l) => l.enabled).map((l) => l.code), saved);
+  services.forEach((s) => { s.untranslated = gaps[s.code] || []; });
+  others.forEach((l) => { l.untranslated = catalog.untranslatedCount(catalog.translationItems(active, groups, UI_STRINGS.en, saved[l.code])); });
+  res.json({ services, groups, languages, iconNames: catalog.ICON_NAMES });
 }));
 
 app.post('/api/admin/services', requireRole('admin'), wrap(async (req, res) => {
@@ -334,17 +441,7 @@ app.get('/api/admin/translations', requireRole('admin'), wrap(async (req, res) =
   const codes = (await db.listLanguages()).map((l) => l.code);
   if (lang === 'en' || !codes.includes(lang)) return res.status(400).json({ error: 'Choose a language to translate' });
   const tr = await db.getTranslations(lang);
-  const items = [];
-  for (const s of await db.listCatalogServices()) {
-    items.push({ key: catalog.keys.serviceName(s.code), section: 'Services', label: s.code + ' name', english: s.name, value: tr[catalog.keys.serviceName(s.code)] || '' });
-    items.push({ key: catalog.keys.serviceDescription(s.code), section: 'Services', label: s.code + ' description', english: s.description, value: tr[catalog.keys.serviceDescription(s.code)] || '' });
-  }
-  for (const g of await db.listGroups('en')) {
-    items.push({ key: catalog.keys.groupLabel(g.id), section: 'Department groups', label: g.id, english: g.englishLabel, value: tr[catalog.keys.groupLabel(g.id)] || '' });
-  }
-  for (const k of Object.keys(UI_STRINGS.en)) {
-    items.push({ key: catalog.keys.ui(k), section: 'Kiosk wording', label: k, english: UI_STRINGS.en[k], value: tr[catalog.keys.ui(k)] || '' });
-  }
+  const items = catalog.translationItems(await db.listCatalogServices(), await db.listGroups('en'), UI_STRINGS.en, tr);
   res.json({ lang, items });
 }));
 
@@ -363,8 +460,8 @@ app.put('/api/admin/translations', requireRole('admin'), wrap(async (req, res) =
 
 // ---- App settings (kiosk, monitor, security, branding) ----
 
-// Public, for the lobby monitor: customers as first name and last initial only.
-app.get('/api/queue', wrap(async (req, res) => {
+// For the lobby monitor: customers as first name and last initial only. Open to anyone unless the screens are locked.
+app.get('/api/queue', screenAccess('monitor'), wrap(async (req, res) => {
   res.json(privacy.publicQueue(await db.queueSnapshot()));
 }));
 
@@ -373,23 +470,53 @@ app.get('/api/staff/queue', requireRole('staff'), wrap(async (req, res) => {
   res.json(await db.queueSnapshot());
 }));
 
-// Check-in attempts per address in the last minute. Kept in memory, so it starts again after a restart.
-const checkinAttempts = new Map();
-function checkinAllowed(address, limit, now) {
+// Attempts per address in the last minute, for the check-in limit and for redeeming access links. Kept in memory, so
+// they start again after a restart.
+function attemptAllowed(attempts, address, limit, now) {
   const cutoff = now - 60000;
-  if (checkinAttempts.size > 1000) {
-    for (const [key, times] of checkinAttempts) {
-      if (!times.some((t) => t > cutoff)) checkinAttempts.delete(key);
+  if (attempts.size > 1000) {
+    for (const [key, times] of attempts) {
+      if (!times.some((t) => t > cutoff)) attempts.delete(key);
     }
   }
-  const recent = (checkinAttempts.get(address) || []).filter((t) => t > cutoff);
+  const recent = (attempts.get(address) || []).filter((t) => t > cutoff);
   const allowed = recent.length < limit;
   if (allowed) recent.push(now);
-  checkinAttempts.set(address, recent);
+  attempts.set(address, recent);
   return allowed;
 }
+const checkinAttempts = new Map();
+function checkinAllowed(address, limit, now) { return attemptAllowed(checkinAttempts, address, limit, now); }
+const redeemAttempts = new Map();
+function redeemAllowed(address, now) { return attemptAllowed(redeemAttempts, address, 20, now); }
 
-app.post('/api/tickets', wrap(async (req, res) => {
+// Public. Tells a screen whether it may open: the setting, and whether this browser is signed in or holds a link of the
+// right kind. Nothing in it is secret. `linkScope` lets the lock screen say a link is for the other kind of screen.
+app.get('/api/access/status', wrap(async (req, res) => {
+  const screen = String(req.query.screen || '');
+  if (!screens.SCOPES.includes(screen)) return res.status(400).json({ error: 'Choose a screen' });
+  res.setHeader('Cache-Control', 'no-store');
+  const settings = await currentSettings();
+  if (!settings.restrict_screens) return res.json({ restricted: false, allowed: true, linkScope: null });
+  const allowed = await screenAllowed(req, res, screen, settings);
+  const link = allowed ? null : await linkFromRequest(req);
+  // A cookie for a link that no longer works is taken away, so the browser stops sending it.
+  if (!allowed && !link && req.cookies[screens.COOKIE]) res.append('Set-Cookie', screens.clearCookie({ path: cookiePath(), secure: req.secure }));
+  res.json({ restricted: true, allowed, linkScope: link ? link.scope : null });
+}));
+
+// Public. A screen opened with an access link hands over the key it carried, once, and is given a cookie that keeps it
+// open. It works whether or not the setting is on, so a link can be tried before the setting is turned on.
+app.post('/api/access/redeem', wrap(async (req, res) => {
+  if (!redeemAllowed(req.ip, Date.now())) return res.status(429).json({ error: 'Too many tries. Wait a minute and try again.' });
+  const key = req.body && req.body.key;
+  const link = await linkForKey(key);
+  if (!link) return res.status(403).json({ error: 'This link is not valid any more. Ask an administrator for a new one.' });
+  res.append('Set-Cookie', screens.cookie(key, { path: cookiePath(), secure: req.secure }));
+  res.json({ ok: true, scope: link.scope, name: link.name });
+}));
+
+app.post('/api/tickets', screenAccess('kiosk'), wrap(async (req, res) => {
   const limit = (await currentSettings()).checkin_rate_per_minute;
   if (limit && !checkinAllowed(req.ip, limit, Date.now())) {
     return res.status(429).json({ error: 'Too many check-ins from this address. Please wait a minute and try again.' });
@@ -507,10 +634,10 @@ app.patch('/api/users/:id', requireRole('manager'), wrap(async (req, res) => {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  // Never leave the system with no active admin.
-  const demotingOrDisabling =
-    (body.role !== undefined && body.role !== 'admin' && target.role === 'admin') ||
-    (body.active === false && target.role === 'admin');
+  // Never leave the system with no active admin. Only an admin who is switched on counts: changing one that is
+  // already off cannot leave the system without an admin it still has.
+  const demotingOrDisabling = target.role === 'admin' && target.active &&
+    ((body.role !== undefined && body.role !== 'admin') || body.active === false);
   if (demotingOrDisabling && (await db.countActiveAdmins()) <= 1) {
     return res.status(409).json({ error: 'At least one active admin account must remain' });
   }
@@ -571,7 +698,8 @@ app.delete('/api/users/:id', requireRole('manager'), wrap(async (req, res) => {
 }));
 
 // ---- Service availability (Manager/Admin manage it; the queue portal's Reopen button uses it too) ----
-const WEEKDAY_TIME = /^\d{2}:\d{2}$/;
+// A real 24-hour clock time, such as 09:30. Two digits alone would let 99:99 through to the database.
+const WEEKDAY_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const NTH_WEEKS_RE = /^(1|2|3|4|last)(,(1|2|3|4|last))*$/;
 const OVERRIDES = ['none', 'closed', 'open'];
 
@@ -647,6 +775,7 @@ app.post('/api/services/:code/schedules', requireRole('manager'), wrap(async (re
   const schedule = await db.createSchedule(code, {
     message, recurrence, weekday, nthWeeks, startTime: startTime + ':00', endTime: endTime + ':00',
   });
+  if (!schedule) return res.status(404).json({ error: 'Service not found' });
   await db.logAudit(req.user.displayName, 'schedule.create', code, message + ' (' + recurrence + ', day ' + weekday + ', ' + startTime + '-' + endTime + ')');
   notify();
   res.status(201).json(schedule);
@@ -915,17 +1044,86 @@ app.put('/api/admin/app-settings', requireRole('admin'), wrap(async (req, res) =
   const stored = await db.getSettings();
   const before = appSettings.parseSettings(stored);
   const changed = [];
+  let screenRuleChanged = false;
   for (const key of Object.keys(result.changes)) {
     const value = result.changes[key];
     if (JSON.stringify(value) === JSON.stringify(before[key])) continue;
     await db.setSetting(key, appSettings.toStored(key, value));
+    if (key === 'restrict_screens') screenRuleChanged = true;
     const show = (v) => (Array.isArray(v) ? v.join(', ') : String(v));
     changed.push(appSettings.DEFINITIONS[key].label + ': ' + show(before[key]) + ' → ' + show(value));
   }
   if (changed.length) {
     await db.logAudit(req.user.displayName, 'settings.update', 'App settings', changed.join('; '));
   }
+  // Turning the rule on or off applies to the live connections as well: each one reconnects and is checked again.
+  if (screenRuleChanged) io.disconnectSockets(true);
   res.json({ values: appSettings.parseSettings(await db.getSettings()) });
+}));
+
+// ---- Access links for the kiosk and monitor (admin) ----
+// A link's key is shown once, when the link is made or replaced, and never again: only a hash of it is kept.
+
+// How the audit log describes a link: "kiosk", "monitor, full", "monitor, left" or "monitor, right".
+function linkKind(scope, panel) {
+  return scope === 'monitor' ? 'monitor, ' + (panel || 'full') : scope;
+}
+
+app.get('/api/admin/screen-links', requireRole('admin'), wrap(async (req, res) => {
+  res.json(await db.listScreenLinks());
+}));
+
+app.post('/api/admin/screen-links', requireRole('admin'), wrap(async (req, res) => {
+  const name = screens.validateName(req.body && req.body.name);
+  if (name.error) return res.status(400).json({ error: name.error });
+  const scope = screens.validateScope(req.body && req.body.scope);
+  if (scope.error) return res.status(400).json({ error: scope.error });
+  const panel = screens.validatePanel(req.body && req.body.panel, scope.value);
+  if (panel.error) return res.status(400).json({ error: panel.error });
+  const key = screens.newKey();
+  const id = await db.createScreenLink(name.value, scope.value, panel.value, screens.hashKey(key), req.user.displayName);
+  forgetLinks();
+  await db.logAudit(req.user.displayName, 'screen_link.create', name.value, linkKind(scope.value, panel.value));
+  res.status(201).json({ id, name: name.value, scope: scope.value, panel: panel.value, key });
+}));
+
+// A new key for the same screen. The old key stops working at once, and a revoked link is switched back on.
+app.post('/api/admin/screen-links/:id/replace', requireRole('admin'), wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid request' });
+  const link = await db.getScreenLink(id);
+  if (!link) return res.status(404).json({ error: 'Link not found' });
+  const key = screens.newKey();
+  await db.replaceScreenLinkKey(id, screens.hashKey(key));
+  forgetLinks();
+  io.disconnectSockets(true);
+  await db.logAudit(req.user.displayName, 'screen_link.replace', link.name, linkKind(link.scope, link.panel));
+  res.json({ id, name: link.name, scope: link.scope, panel: link.panel, key });
+}));
+
+app.post('/api/admin/screen-links/:id/revoke', requireRole('admin'), wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid request' });
+  const link = await db.getScreenLink(id);
+  if (!link) return res.status(404).json({ error: 'Link not found' });
+  await db.revokeScreenLink(id);
+  forgetLinks();
+  // Screens already open lose their live connection too, and are refused the next time they ask for anything.
+  io.disconnectSockets(true);
+  await db.logAudit(req.user.displayName, 'screen_link.revoke', link.name, linkKind(link.scope, link.panel));
+  res.json({ ok: true });
+}));
+
+app.delete('/api/admin/screen-links/:id', requireRole('admin'), wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid request' });
+  const link = await db.getScreenLink(id);
+  if (!link) return res.status(404).json({ error: 'Link not found' });
+  await db.deleteScreenLink(id);
+  forgetLinks();
+  io.disconnectSockets(true);
+  await db.logAudit(req.user.displayName, 'screen_link.delete', link.name, linkKind(link.scope, link.panel));
+  res.json({ ok: true });
 }));
 
 app.put('/api/admin/logo', requireRole('admin'), wrap(async (req, res) => {
@@ -966,7 +1164,7 @@ app.post('/api/admin/cleanup', requireRole('admin'), wrap(async (req, res) => {
 
 // Runs the automated test files (the same ones `npm test` runs) and returns their output. The list
 // is fixed in the code, so nothing from the request reaches the command.
-const TEST_FILES = ['tests/auth.test.js', 'tests/availability.test.js', 'tests/reports.test.js', 'tests/schema.test.js', 'tests/settings.test.js', 'tests/http.test.js', 'tests/catalog.test.js', 'tests/privacy.test.js'];
+const TEST_FILES = ['tests/auth.test.js', 'tests/availability.test.js', 'tests/reports.test.js', 'tests/schema.test.js', 'tests/settings.test.js', 'tests/http.test.js', 'tests/catalog.test.js', 'tests/privacy.test.js', 'tests/sw.test.js', 'tests/screens.test.js', 'tests/manage-page.test.js'];
 app.post('/api/admin/tests', requireRole('admin'), wrap(async (req, res) => {
   await db.logAudit(req.user.displayName, 'tests.run', 'Automated tests', null);
   execFile(process.execPath, ['--test', ...TEST_FILES], { cwd: __dirname, timeout: 120000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
@@ -977,7 +1175,8 @@ app.post('/api/admin/tests', requireRole('admin'), wrap(async (req, res) => {
 }));
 
 app.get('/api/admin/audit', requireRole('admin'), wrap(async (req, res) => {
-  const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+  // A whole number from 1 to 1000. A fraction (1.5) would be a syntax error in the query, so it is rounded down.
+  const limit = Math.min(Math.max(Math.floor(Number(req.query.limit)) || 200, 1), 1000);
   res.json(await db.listAudit(limit, String(req.query.q || '').slice(0, 100)));
 }));
 
@@ -1073,6 +1272,9 @@ async function bootstrapAdmin() {
 app.use((err, req, res, next) => {
   // Body too large (for example a logo that is too big to upload): say so, rather than a generic error.
   if (err.type === 'entity.too.large') return res.status(413).json({ error: 'That file is too large. Choose a smaller image.' });
+  // A request the server could not read (malformed JSON, for example) is the sender's mistake, not a fault here.
+  const status = err.status || err.statusCode;
+  if (status >= 400 && status < 500) return res.status(status).json({ error: 'That request could not be read.' });
   console.error(err);
   res.status(500).json({ error: 'Server error' });
 });
@@ -1099,4 +1301,4 @@ if (!process.env.NODE_TEST_CONTEXT) {
   });
 }
 
-module.exports = { app, server, start, checkAutoClose };
+module.exports = { app, server, start, checkAutoClose, withoutBasePath, trustProxySetting };

@@ -14,8 +14,12 @@
       --mon-call: #f5b841;
     }
     body { min-height: 100vh; margin: 0; }
+    /* No scrollbar: a lobby screen has nobody to scroll it, and a bar that comes and goes would change the width the
+       page is fitted into (fitQueues measures the page against the window). The wheel and keys still scroll. */
+    html { scrollbar-width: none; }
+    html::-webkit-scrollbar { display: none; }
 
-    .mon { min-height: 100vh; box-sizing: border-box; padding: clamp(14px, 2.2vh, 26px) clamp(18px, 2.4vw, 36px); display: flex; flex-direction: column; gap: clamp(16px, 2.6vh, 28px); }
+    .mon { min-height: 100vh; box-sizing: border-box; padding: clamp(14px, 2.2vh, 26px) clamp(18px, 2.4vw, 36px); display: flex; flex-direction: column; gap: clamp(16px, 2.6vh, 28px); transform-origin: top left; }
 
     /* Header: title left, clock and date right. */
     .mon-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
@@ -48,9 +52,9 @@
     .serving-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     /* Name and service on the left; the staff member on the right, under a small HELPING label. */
     .scard { min-width: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px clamp(14px, 2vw, 28px); background: color-mix(in srgb, var(--fg) 4%, var(--card)); border: 1px solid var(--border); border-left: 5px solid var(--accent); border-radius: 14px; padding: clamp(14px, 2.2vh, 22px) clamp(16px, 2vw, 24px); }
-    .scard.size-lg { --name-size: clamp(28px, 4.6vh, 46px); --detail-size: clamp(20px, 3vh, 28px); --staff-size: clamp(26px, 3.8vh, 36px); }
-    .scard.size-md { --name-size: clamp(22px, 3.4vh, 34px); --detail-size: clamp(18px, 2.6vh, 24px); --staff-size: clamp(22px, 3.1vh, 28px); }
-    .scard.size-sm { --name-size: clamp(18px, 2.6vh, 26px); --detail-size: clamp(16px, 2.2vh, 20px); --staff-size: clamp(19px, 2.6vh, 24px); }
+    .scard.size-lg { --name-size: clamp(36px, 6vh, 62px); --detail-size: clamp(20px, 3vh, 28px); --staff-size: clamp(26px, 3.8vh, 36px); }
+    .scard.size-md { --name-size: clamp(28px, 4.6vh, 48px); --detail-size: clamp(18px, 2.6vh, 24px); --staff-size: clamp(22px, 3.1vh, 28px); }
+    .scard.size-sm { --name-size: clamp(22px, 3.6vh, 36px); --detail-size: clamp(16px, 2.2vh, 20px); --staff-size: clamp(19px, 2.6vh, 24px); }
     .scard-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: clamp(4px, 0.8vh, 8px); }
     .scard-name { font-size: var(--name-size); font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
     .scard-service { display: flex; align-items: center; gap: 10px; font-size: var(--detail-size); font-weight: 600; color: var(--muted); }
@@ -92,6 +96,19 @@
     /* A department's service queues sit side by side when there is room, and each takes the full
        width when there is only one. */
     .dept-body { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(12px, 1.8vh, 18px); padding: clamp(10px, 1.6vh, 16px) clamp(14px, 1.8vw, 18px); align-content: start; }
+    /* Beside a department with queues, a department with nobody waiting is just its name and icon, so a long list
+       of quiet departments cannot push the page past the screen. */
+    .dept.is-compact { align-self: start; }
+    /* Last resort, when even the shortest queues leave the page too tall: the quiet departments shrink a little more. */
+    .queues-layout.dense .dept.is-compact .dept-head { padding: 5px 12px; }
+    .queues-layout.dense .dept.is-compact .dept-name { font-size: clamp(17px, 2.4vh, 24px); }
+    .queues-layout.dense .dept.is-compact .icon-disc { width: 26px; height: 26px; }
+    .queues-layout.dense .wide-stack, .queues-layout.dense .other-stack { gap: 8px; }
+    .dept.is-compact .dept-head { border-bottom: 0; padding: clamp(8px, 1.2vh, 12px) clamp(12px, 1.4vw, 16px); }
+    .dept.is-compact .dept-name { font-size: clamp(20px, 2.9vh, 30px); line-height: 1.15; }
+    .dept.is-compact .dept-stats { display: none; }
+    .compact-closed { margin: 0; padding: 0 clamp(14px, 1.8vw, 18px) clamp(10px, 1.4vh, 14px); font-size: clamp(18px, 2.6vh, 24px); font-weight: 700; color: var(--danger); }
+    .queues-layout.split .other-stack.many { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.2vh, 12px); }
     .quiet-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: clamp(14px, 2.4vh, 24px) 16px; text-align: center; }
     .quiet-body .icon-disc { width: clamp(38px, 5vh, 48px); height: clamp(38px, 5vh, 48px); }
     .quiet-text { margin: 0; font-size: clamp(22px, 3.2vh, 30px); color: var(--muted); }
@@ -105,9 +122,9 @@
     .sq-list li { display: flex; align-items: center; gap: clamp(10px, 1.2vw, 14px); padding: clamp(5px, 0.8vh, 8px) 6px; border-radius: 10px; }
     /* The customer next up gets a subtle tint and a NEXT tag. */
     .sq-list li.is-next { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-    .pos { flex: none; width: clamp(36px, 4.8vh, 48px); height: clamp(36px, 4.8vh, 48px); border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: clamp(20px, 2.8vh, 26px); font-weight: 800; font-variant-numeric: tabular-nums; }
-    .wname { flex: 1; min-width: 0; font-size: clamp(26px, 3.8vh, 36px); font-weight: 600; overflow-wrap: anywhere; }
-    .next-tag { flex: none; font-size: 15px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: #fff; }
+    .pos { flex: none; width: clamp(44px, 6vh, 64px); height: clamp(44px, 6vh, 64px); border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: clamp(24px, 3.4vh, 34px); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .wname { flex: 1; min-width: 0; font-size: clamp(32px, 4.8vh, 52px); font-weight: 600; overflow-wrap: anywhere; }
+    .next-tag { flex: none; font-size: clamp(15px, 2vh, 20px); font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: #fff; }
     /* A queue box scrolls on its own when its names don't all fit; the scrollbar is hidden. */
     .sq-scroll { overflow-y: auto; scrollbar-width: none; }
     .sq-scroll::-webkit-scrollbar { display: none; }
@@ -132,6 +149,9 @@
   </style>
 </head>
 <body>
+  <!-- The frame is as tall as the page looks on screen: when the page is drawn smaller to fit (see fitQueues), the
+       frame shrinks with it, so the window has nothing left to scroll. -->
+  <div id="mon-frame">
   <main class="mon">
     <header class="mon-header">
       <h1 class="mon-title">Lobby Check-In</h1>
@@ -166,6 +186,7 @@
       </div>
     </section>
   </main>
+  </div>
 
   <div id="calling" role="status" aria-live="polite">
     <div class="call-label">Now Calling</div>
@@ -177,6 +198,7 @@
   <div id="status"></div>
 
   <script src="socket.io/socket.io.js"></script>
+  <script src="access.js" data-screen="monitor"></script>
   <script src="app-settings.js"></script>
   <script src="icons.js"></script>
   <script>
@@ -190,7 +212,7 @@
       var pageSize = MAX_PAGE;
       var CALL_MS;            // how long the Now Calling notice stays on screen (from Settings)
 
-      // Department groups come from the server (see Services & languages), with their icons and colours.
+      // Department groups come from the server (see Service Configuration), with their icons and colours.
       // Each service's icon and colour come with the queue data. The drawings are in icons.js.
       var GROUPS = {};          // group id -> { label, icon, color, codes }
       var GROUP_BY_CODE = {};   // service code -> group id
@@ -198,7 +220,7 @@
       var DEFAULT_UNIT_COLOR = '#3b5bdb';
 
       // Which departments each monitor shows, in order: a group id or a single service code. Open
-      // monitor.html?panel=left or ?panel=right. Set in Settings → Lobby monitor. With no panel, every department shows.
+      // monitor.html?panel=left or ?panel=right. Set in Settings → Monitor configuration. With no panel, every department shows.
       var panel = new URLSearchParams(location.search).get('panel');
       var ORDER = null;
 
@@ -406,7 +428,7 @@
       }
 
       var audioCtx = null;
-      var chimeOn = false;    // from Settings → Lobby monitor, once loaded
+      var chimeOn = false;    // from Settings → Monitor configuration, once loaded
 
       // Plays a short, cheerful rising arpeggio made with the Web Audio API, so no sound file is needed.
       function playChime() {
@@ -492,10 +514,16 @@
       }
 
       // A department with nobody waiting: same card, with a short message instead of queues.
-      function quietCard(u, st) {
-        var card = el('article', 'dept');
+      function quietCard(u, st, compact) {
+        var card = el('article', 'dept' + (compact ? ' is-compact' : ''));
         card.style.setProperty('--accent', u.color);
         card.appendChild(deptHeader(u, st));
+
+        if (compact) {
+          // Just the header; a closed department also says so, since the header does not.
+          if (st.closed) card.appendChild(el('p', 'compact-closed', 'Closed'));
+          return card;
+        }
 
         var body = el('div', 'quiet-body');
         body.appendChild(discFor(svgIcon(u.iconInner)));
@@ -506,24 +534,77 @@
       }
 
       // Departments are split into the wide column and the other column; see the layout CSS.
+      var squeeze = 0;  // 0 roomy, 1 departments with nobody waiting are slim bars, 2 slimmer still
       var lastUnits = null;
       var lastMode = null;
-      // Finds the largest page size whose whole page still fits the window, so names are only
-      // rotated when they genuinely don't fit. Binary search: each try is a quick redraw.
+      // The whole page can be drawn smaller as a last resort (see fitQueues). It is never drawn below half size.
+      var MIN_SCALE = 0.5;
+      var monEl = document.querySelector('.mon');
+      var frameEl = $('mon-frame');
+
+      // Draws the whole page at a fraction of its size. It is laid out wider by the same factor, so once scaled down
+      // it still fills the screen, and the frame around it is made as tall as the scaled page, so the window has
+      // nothing left to scroll.
+      function setScale(s) {
+        if (s >= 1) {
+          monEl.style.transform = '';
+          monEl.style.width = '';
+          frameEl.style.height = '';
+          frameEl.style.overflow = '';
+          return;
+        }
+        monEl.style.transform = 'scale(' + s + ')';
+        monEl.style.width = (100 / s) + '%';
+        frameEl.style.overflow = 'hidden';
+        frameEl.style.height = Math.ceil(monEl.offsetHeight * s) + 'px';
+      }
+
+      // Whether the whole page, as it looks on screen, fits the window.
+      function fits() { return monEl.getBoundingClientRect().height <= window.innerHeight + 1; }
+
+      // The roomiest page that fits at the current scale, or false when not even the shortest one does. The roomy
+      // layout comes first. If even one name per queue is too tall, the departments with nobody waiting shrink to a
+      // slim bar, and then slimmer still. Within each, the page size is the largest that fits (a binary search: each
+      // try is a quick redraw), so names only scroll when they genuinely don't fit.
+      function searchLayouts(units, mode) {
+        for (squeeze = 0; squeeze <= 2; squeeze++) {
+          var lo = MIN_PAGE, hi = MAX_PAGE, best = 0;
+          while (lo <= hi) {
+            var mid = (lo + hi) >> 1;
+            pageSize = mid;
+            drawQueues(units, mode);
+            if (fits()) { best = mid; lo = mid + 1; }
+            else hi = mid - 1;
+          }
+          if (best) { pageSize = best; drawQueues(units, mode); return true; }
+        }
+        return false;
+      }
+
       function fitQueues(units, mode) {
+        setScale(1);
         // A hidden or collapsed window has no usable height; measuring it would wrongly shrink
         // every queue, so leave the page size as it is.
         if (window.innerHeight < 200) { drawQueues(units, mode); return; }
-        var lo = MIN_PAGE, hi = MAX_PAGE, best = MIN_PAGE;
-        while (lo <= hi) {
-          var mid = (lo + hi) >> 1;
-          pageSize = mid;
-          drawQueues(units, mode);
-          if (document.body.scrollHeight <= window.innerHeight) { best = mid; lo = mid + 1; }
-          else hi = mid - 1;
-        }
-        pageSize = best;
+        if (searchLayouts(units, mode)) return;
+        // Not even the shortest page fits. A lobby screen cannot be scrolled, so rather than let the bottom run off it
+        // the whole page is drawn smaller: first the largest size at which the shortest page fits, then the roomiest
+        // page that fits at that size.
+        squeeze = 2;
+        pageSize = MIN_PAGE;
         drawQueues(units, mode);
+        var lo = MIN_SCALE, hi = 1, scale = MIN_SCALE;
+        for (var i = 0; i < 6; i++) {
+          var mid = (lo + hi) / 2;
+          setScale(mid);
+          if (fits()) { scale = mid; lo = mid; } else { hi = mid; }
+        }
+        setScale(scale);
+        if (!searchLayouts(units, mode)) {
+          squeeze = 2;
+          pageSize = MIN_PAGE;
+          drawQueues(units, mode);
+        }
       }
 
       function renderQueues(units, mode) {
@@ -545,12 +626,14 @@
         otherStack.textContent = '';
         wide.forEach(function (x) { wideStack.appendChild(deptCard(x.u, x.st)); });
         other.forEach(function (x) {
-          otherStack.appendChild(x.st.waiting ? deptCard(x.u, x.st) : quietCard(x.u, x.st));
+          otherStack.appendChild(x.st.waiting ? deptCard(x.u, x.st) : quietCard(x.u, x.st, !!wide.length || other.length > 6 || squeeze >= 1));
         });
+        // Many departments beside the wide column go two to a row.
+        otherStack.classList.toggle('many', !!wide.length && other.length > 6);
         wideStack.classList.toggle('hidden', !wide.length);
         otherStack.classList.toggle('hidden', !other.length);
         $('queues-layout').className = 'queues-layout' +
-          (wide.length && other.length ? ' split' : !wide.length ? ' other-only' : '');
+          (wide.length && other.length ? ' split' : !wide.length ? ' other-only' : '') + (squeeze >= 2 ? ' dense' : '');
 
         $('queues-head').classList.toggle('hidden', mode === 'empty');
         $('queues-section').classList.toggle('hidden', mode === 'empty' && !other.length);
@@ -573,7 +656,7 @@
       // Slow, continuous scroll for any queue that doesn't fit: down, pause, back up, pause.
       // Each queue's position is remembered by service code, so a redraw doesn't restart it.
       var SCROLL_PX = 1;        // pixels per tick
-      var SCROLL_TICK_MS;     // from Settings → Lobby monitor, once loaded
+      var SCROLL_TICK_MS;     // from Settings → Monitor configuration, once loaded
       var SCROLL_PAUSE = 75;    // ticks to rest at each end (about 3 seconds)
       var scrollState = {};
       function tickScrollers() {
@@ -607,6 +690,8 @@
       }
 
       async function refresh() {
+        // While the lock screen is up (see access.js) there is nothing to ask for; the page reloads when it is open again.
+        if (window.screenAccess && window.screenAccess.locked) return;
         try {
           var res = await fetch(BASE + 'api/queue', { cache: 'no-store' });
           if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -631,7 +716,7 @@
       setInterval(tick, 1000);
       tick();
 
-      // The screen starts once the settings from Management → Settings → Kiosk and monitor have loaded.
+      // The screen starts once the settings from Management → Settings → Monitor configuration have loaded.
       var SCROLL_SPEEDS = { slow: 60, normal: 40, fast: 25 };
       function applyMonitorSettings(s) {
         document.documentElement.setAttribute('data-theme', s.monitor_theme);
@@ -644,15 +729,25 @@
         scrollTimer = setInterval(tickScrollers, SCROLL_TICK_MS);
         refresh();
       }
-      window.appSettingsReady.then(function (s) {
+      // If the settings cannot be loaded because the server cannot be reached, say so rather than show an empty screen.
+      var monitorStarted = false;
+      setTimeout(function () { if (!monitorStarted) $('status').textContent = 'Connection lost, retrying…'; }, 6000);
+      window.appSettingsReady.then(function () { monitorStarted = true; });
+      // The screen also waits until it may open (see access.js), which is at once unless the screens are locked.
+      Promise.all([window.appSettingsReady, window.screenAccessReady]).then(function (ready) {
+        var s = ready[0];
         loadCatalog().then(function () {
           applyMonitorSettings(s);
           window.watchAppSettings(applyMonitorSettings);
           if (window.io) {
             var socket = io({ path: BASE + 'socket.io' });
             socket.on('queue:changed', refresh);
-            // Groups, icons or colours were edited in Services & languages.
+            // Groups, icons or colours were edited in Service Configuration.
             socket.on('catalog:changed', function () { loadCatalog().then(refresh); });
+            // Refused the live connection while locked: stop asking, since the page reloads when it is open again.
+            socket.on('connect_error', function (err) {
+              if (err && err.message === 'locked') { socket.disconnect(); if (window.screenAccess) window.screenAccess.refused(); }
+            });
           }
           setInterval(refresh, 30000);
           // Groups change rarely; re-read them once a minute too, for hosts where the live connection does not get through.

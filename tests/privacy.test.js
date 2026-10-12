@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { publicName, publicTicket, publicQueue } = require('../privacy');
+const { publicName, publicTicket, publicQueue } = require('../lib/privacy');
 
 test('a customer is shown as first name and last initial', () => {
   assert.equal(publicName('Jane Smith'), 'Jane S.');

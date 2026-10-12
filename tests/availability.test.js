@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveAvailability, isScheduleActiveAt } = require('../availability');
+const { resolveAvailability, isScheduleActiveAt } = require('../lib/availability');
 
 // 14 October 2026 is a Wednesday. 7 October is the 1st Wednesday, 21 October the 3rd, 28 October the last.
 const wed = (day, hour, minute) => new Date(2026, 9, day, hour, minute);

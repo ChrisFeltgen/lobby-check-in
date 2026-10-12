@@ -57,7 +57,7 @@
 <body>
   <header class="top">
     <div class="brand">
-      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.style.display='none'"></span>
       <div>
         <p class="org-label" data-org-name hidden></p>
         <h1>My account</h1>
@@ -272,8 +272,8 @@
       });
 
       // ---- Default service queues ----
-      // Appointment Check-In is always watched in the queue portal, so it's ticked and can't be unticked here.
-      var ALWAYS_WATCHED = 'AC';
+      // A service marked "pinned" in Service Configuration (Appointment Check-In, by default) is always watched in the
+      // queue portal, so it's ticked and can't be unticked here.
       var services = [];
 
       function renderQueues() {
@@ -284,7 +284,7 @@
         var box = $('queue-picks');
         box.textContent = '';
         services.forEach(function (svc) {
-          var always = svc.code === ALWAYS_WATCHED;
+          var always = !!svc.pinned;
           var label = document.createElement('label');
           var input = document.createElement('input');
           input.type = 'checkbox';
@@ -338,7 +338,7 @@
           .then(function () { window.location.href = BASE + 'index.html'; });
       });
 
-      // The minimum length comes from Settings → Security and sessions.
+      // The minimum length comes from Security → Security and sessions.
       window.appSettingsReady.then(function (s) {
         var min = s.min_password_length;
         $('new-password').minLength = min;

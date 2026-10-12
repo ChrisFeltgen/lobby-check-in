@@ -142,7 +142,7 @@
 
       // Other staff pages send people here to sign in, with ?next= naming the page to return to.
       // Only the staff pages are accepted, so the parameter can't send anyone elsewhere.
-      var NEXT_PAGES = ['queue.html', 'manage.html', 'account.html'];
+      var NEXT_PAGES = ['queue.html', 'manage.html', 'account.html', 'catalog.html'];
       function nextPage() {
         var next = new URLSearchParams(location.search).get('next');
         return NEXT_PAGES.indexOf(next) >= 0 ? next : null;

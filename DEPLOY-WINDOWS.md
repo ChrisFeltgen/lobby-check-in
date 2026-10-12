@@ -243,7 +243,7 @@ Test every screen under that path. The own-address setup is simpler and less lik
 |---|---|---|
 | Kiosk | `https://queue.example.gov/kiosk.html` | Ticket prints or confirms |
 | Queue portal | `https://queue.example.gov/queue.html` | Staff can sign in and call a customer |
-| Management | `https://queue.example.gov/manage.html` | Services, Staff, Reports, Settings and Health & audit tabs load |
+| Management | `https://queue.example.gov/manage.html` | Open & close, Staff, Reports, Settings and Health & audit tabs load |
 | Health & audit (admin) | `https://queue.example.gov/manage.html?tab=health` | **Run health check** and **Check database** both report healthy |
 | Monitor | `https://queue.example.gov/monitor.html?panel=left` | Updates within seconds of a change in the queue portal |
 

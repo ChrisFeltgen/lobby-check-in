@@ -83,9 +83,10 @@
 
     .queue-list { display: flex; flex-direction: column; gap: 8px; }
 
-    .qrow { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; background: var(--card); transition: border-color 0.12s ease, background-color 0.12s ease; }
-    .qrow:not(.pinned):hover, .qrow:not(.pinned):focus-visible { border-color: var(--accent); }
-    .qrow.pinned { cursor: default; }
+    .qrow { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; user-select: none; background: var(--card); transition: border-color 0.12s ease, background-color 0.12s ease; }
+    /* A watched queue is not clickable as a whole: stopping to watch it is its own button, away from Call next. */
+    .qrow:not(.watched) { cursor: pointer; }
+    .qrow:not(.watched):hover { border-color: var(--accent); }
     .qrow.closed { background: color-mix(in srgb, var(--danger) 8%, var(--card)); border-color: var(--danger); }
     .qrow.has-waiting:not(.watched) { border-left: 3px solid var(--accent); }
     .qrow.has-waiting.closed { border-left-color: var(--danger); }
@@ -108,12 +109,18 @@
     .qstatus { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--danger); font-weight: 600; margin-top: 2px; }
     .qdot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex: none; }
 
+    /* The count and the buttons share the second line, so the queue's name keeps the whole width of the row. */
+    .qrow-meta-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+    .qrow-meta-line .qrow-meta { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+    .qrow.watched .qrow-meta-line { min-height: 28px; }
     .qrow-actions { flex: none; display: flex; align-items: center; gap: 6px; }
-    .qcall { min-height: 26px; min-width: 26px; padding: 0; border-radius: 6px; background: var(--accent); color: #fff; border: 0; font-size: 12px; line-height: 1; }
+    .qcall { min-height: 28px; min-width: 32px; padding: 0; border-radius: 7px; background: var(--accent); color: #fff; border: 0; font-size: 13px; line-height: 1; }
     .qcall:hover { filter: brightness(0.9); }
+    .qwatch { flex: none; min-height: 22px; min-width: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: transparent; color: var(--muted); border: 0; font-size: 12px; line-height: 1; opacity: 0.55; }
+    .qwatch:hover, .qwatch:focus-visible { opacity: 1; color: var(--danger); }
+    .undo-bar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 18px; max-width: calc(100vw - 32px); background: var(--fg); color: var(--bg); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-size: 15px; }
+    .undo-bar button { min-height: 32px; padding: 4px 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); font-weight: 700; }
     .qmenu-btn { min-height: 24px; width: 26px; padding: 0; font-size: 14px; border-radius: 6px; }
-    .qchevron { flex: none; color: var(--muted); display: flex; }
-    .qchevron svg { width: 16px; height: 16px; }
 
     .qshow-all { width: 100%; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
@@ -344,12 +351,23 @@
   <div id="menu" class="menu hidden"></div>
 
   <script src="socket.io/socket.io.js"></script>
+  <script src="icons.js"></script>
   <script>
     (function () {
       var BASE = location.pathname.replace(/[^/]*$/, '');
-      // Appointments always has someone due any minute, so it stays pinned to Your Watched
-      // Queues — unlike every other queue, it can't be unwatched.
-      var PINNED_CODE = 'AC';
+      // A service marked "pinned" in Services & languages (Appointment Check-In, by default) always has someone
+      // due any minute, so it stays in Your Watched Queues and can't be unwatched.
+      function isPinned(code) {
+        var svc = state.queue.find(function (s) { return s.code === code; });
+        return !!(svc && svc.pinned);
+      }
+      function pinnedCodes() {
+        return state.queue.filter(function (s) { return s.pinned; }).map(function (s) { return s.code; });
+      }
+      function addPinned(codes) {
+        pinnedCodes().forEach(function (c) { if (codes.indexOf(c) < 0) codes.push(c); });
+        return codes;
+      }
       var state = {
         user: null,          // { id, username, displayName, role } once signed in
         counter: localStorage.getItem('staffCounter') || '',
@@ -410,8 +428,7 @@
         if (!state.watched) return all;
         var codes = all.filter(function (c) { return state.watched.indexOf(c) >= 0; });
         // Pinned regardless of what's saved — covers old saved lists from before this existed.
-        if (all.indexOf(PINNED_CODE) >= 0 && codes.indexOf(PINNED_CODE) < 0) codes.push(PINNED_CODE);
-        return codes;
+        return addPinned(codes);
       }
 
       function loadWatched() {
@@ -442,7 +459,7 @@
         var all = state.queue.map(function (q) { return q.code; });
         function normalize(list) {
           var codes = list ? list.filter(function (c) { return all.indexOf(c) >= 0; }) : all.slice();
-          if (all.indexOf(PINNED_CODE) >= 0 && codes.indexOf(PINNED_CODE) < 0) codes.push(PINNED_CODE);
+          addPinned(codes);
           return codes.sort().join(',');
         }
         var saved = state.user && Array.isArray(state.user.defaultQueues) ? state.user.defaultQueues : null;
@@ -477,11 +494,31 @@
       }
 
       function toggleWatch(code) {
-        if (code === PINNED_CODE) return;
+        if (isPinned(code)) return;
         var w = watchedCodes().slice();
         var i = w.indexOf(code);
         if (i >= 0) w.splice(i, 1); else w.push(code);
         setWatched(w);
+        if (i >= 0) showUndo(code);
+      }
+
+      // After a queue is taken out of the watched list, says so for a few seconds with a way to put it back.
+      var undoTimer = null;
+      function showUndo(code) {
+        var old = document.getElementById('undo-bar');
+        if (old) old.remove();
+        clearTimeout(undoTimer);
+        var svc = state.queue.find(function (s) { return s.code === code; });
+        var bar = el('div', 'undo-bar');
+        bar.id = 'undo-bar';
+        bar.setAttribute('role', 'status');
+        bar.appendChild(el('span', null, 'Stopped watching ' + (svc ? svc.name : code) + '.'));
+        var undo = el('button', null, 'Undo');
+        undo.type = 'button';
+        undo.addEventListener('click', function () { bar.remove(); clearTimeout(undoTimer); toggleWatch(code); });
+        bar.appendChild(undo);
+        document.body.appendChild(bar);
+        undoTimer = setTimeout(function () { bar.remove(); }, 7000);
       }
 
       // Other Services can be collapsed out of the way entirely, for a staff member who only
@@ -562,26 +599,17 @@
       var ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
       var ICON_PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
 
-      // One icon per service, same set used on the queue monitor — same shape language for the
-      // same service, wherever it shows up in the app.
-      var ICON_PATHS = {
-        BPI: '<path d="M6 22V4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v18Z"/><path d="M14 9h4a1 1 0 0 1 1 1v12"/><path d="M10 9h.01M10 13h.01M10 17h.01"/><path d="M2 22h20"/>',
-        BSC: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
-        CR: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
-        CE: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
-        BTD: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
-        UF: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
-        ZD: '<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894L8.106 3.447a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15.236"/><path d="M9 3.764v15.236"/>',
-        LS: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="m18.5 19.5 2 2"/>',
-        AB: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
-        AC: '<path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
-      };
+      // Icons come from the service list (see icons.js), so a service shows the same icon everywhere.
       function svgIcon(inner) {
         var wrap = document.createElement('span');
         wrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
         return wrap.firstChild;
       }
-      function iconFor(code) { return svgIcon(ICON_PATHS[code] || ICON_PATHS.AC); }
+      function iconFor(code) {
+        var svc = state.queue.find(function (x) { return x.code === code; });
+        var paths = window.ICON_PATHS || {};
+        return svgIcon(paths[svc && svc.icon] || paths.calendar || '');
+      }
 
       // Calls the first (longest-waiting) customer in one queue, regardless of watch state.
       function quickCallNext(svc) {
@@ -700,7 +728,11 @@
       }
 
       // Adds a customer from this station. Uses the same check-in as the kiosk.
-      var APPOINTMENT_CODE = 'AC';
+      // Whether a service asks who the customer is seeing and the appointment time (set in Services & languages).
+      function asksAppointment(code) {
+        var svc = state.queue.find(function (s) { return s.code === code; });
+        return !!(svc && svc.asksAppointment);
+      }
 
       function appointmentTimes() {
         var out = [];
@@ -758,7 +790,7 @@
         apptFields.appendChild(labelled('Appointment time', timeSel));
         form.appendChild(apptFields);
 
-        function syncAppt() { apptFields.classList.toggle('hidden', serviceSel.value !== APPOINTMENT_CODE); }
+        function syncAppt() { apptFields.classList.toggle('hidden', !asksAppointment(serviceSel.value)); }
         serviceSel.addEventListener('change', syncAppt);
         syncAppt();
 
@@ -780,7 +812,7 @@
           err.textContent = '';
           var body = { serviceId: serviceSel.value, name: nameInput.value.trim() };
           if (!body.name) { err.textContent = 'Enter the customer name.'; return; }
-          if (serviceSel.value === APPOINTMENT_CODE) {
+          if (asksAppointment(serviceSel.value)) {
             body.appointment = { with: withInput.value.trim(), time: timeSel.value };
             if (!body.appointment.with) { err.textContent = 'Enter who the customer is seeing.'; return; }
             if (!body.appointment.time) { err.textContent = 'Choose the appointment time.'; return; }
@@ -828,7 +860,6 @@
       }
 
       // ---- Rendering ----
-      var ICON_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
 
       // Closed-queue reason/reopen actions, tucked behind a small menu button instead of sitting
       // inline — keeps the row compact regardless of how long the reason text is. Open is the
@@ -858,18 +889,14 @@
       // One row in the sidebar list, shared by both watched and unwatched services — only the
       // class names, the chevron, and the click behavior differ between them.
       function queueRow(svc, opts) {
-        var pinned = opts.watched && svc.code === PINNED_CODE;
+        var pinned = opts.watched && !!svc.pinned;
         var hasWaiting = svc.waiting.length > 0;
         var cls = 'qrow' + (opts.watched ? ' watched' : '') + (!svc.available ? ' closed' : '') + (hasWaiting ? ' has-waiting' : '') + (pinned ? ' pinned' : '');
         var row = el('div', cls);
-        if (!pinned) {
-          row.setAttribute('role', 'button');
-          row.setAttribute('tabindex', '0');
-          row.setAttribute('aria-pressed', String(!!opts.watched));
-          row.title = opts.watched ? 'Click to stop watching this queue' : 'Click to watch this queue';
-        } else {
-          row.title = 'Always watched';
-        }
+        // A queue that is not watched can be watched by clicking anywhere on it, which does no harm. A watched one
+        // is stopped only with its own button, so a click aimed at Call next cannot hide it.
+        if (pinned) row.title = 'Always watched';
+        else if (!opts.watched) row.title = 'Click to watch this queue';
 
         var iconWrap = el('span', 'qicon');
         iconWrap.appendChild(iconFor(svc.code));
@@ -884,32 +911,37 @@
         if (longestWait !== null) {
           meta.appendChild(el('span', 'qwait ' + waitClass(longestWait), '· Longest ' + waitText(longestWait)));
         }
-        body.appendChild(meta);
+        // The count, Call next and the cross share this second line; the name above has the full width of the row.
+        var line = el('div', 'qrow-meta-line');
+        line.appendChild(meta);
+        body.appendChild(line);
         var status = queueStatusRow(svc);
         if (status) body.appendChild(status);
         row.appendChild(body);
 
         var actions = el('div', 'qrow-actions');
-        if (hasWaiting && svc.available) {
+        var callable = hasWaiting && svc.available;
+        if (callable) {
           var mini = el('button', 'qcall', '▶');
           mini.type = 'button';
           mini.title = 'Call next in ' + svc.name;
+          mini.setAttribute('aria-label', 'Call next in ' + svc.name);
           mini.addEventListener('click', function (e) { e.stopPropagation(); quickCallNext(svc); });
           actions.appendChild(mini);
         }
+        // Only a watched queue has a button, and it is a plain cross, always last: the row of one that is not watched
+        // is clicked to watch it.
         if (opts.watched && !pinned) {
-          var chevron = el('span', 'qchevron');
-          chevron.innerHTML = ICON_CHEVRON;
-          actions.appendChild(chevron);
+          var stop = el('button', 'qwatch', '✕');
+          stop.type = 'button';
+          stop.title = 'Stop watching ' + svc.name;
+          stop.setAttribute('aria-label', stop.title);
+          stop.addEventListener('click', function (e) { e.stopPropagation(); toggleWatch(svc.code); });
+          actions.appendChild(stop);
         }
-        if (actions.childNodes.length) row.appendChild(actions);
+        if (actions.childNodes.length) line.appendChild(actions);
 
-        if (!pinned) {
-          row.addEventListener('click', function () { toggleWatch(svc.code); });
-          row.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleWatch(svc.code); }
-          });
-        }
+        if (!pinned && !opts.watched) row.addEventListener('click', function () { toggleWatch(svc.code); });
         return row;
       }
 
@@ -928,13 +960,13 @@
         // Appointments is always watched, but it's a card worth taking up space for only once
         // someone's actually in it — an empty one just sits there otherwise.
         var watchedDisplay = watchedSvcs.filter(function (s) {
-          return s.code !== PINNED_CODE || s.waiting.length > 0 || !s.available;
+          return !s.pinned || s.waiting.length > 0 || !s.available;
         });
         // Appointments leads the list — it's always watched, and someone's due any minute.
         // Everything else is alphabetical, so the list stays predictable as queues move in and
         // out of it.
         watchedDisplay.sort(function (a, b) {
-          var pinnedDiff = (b.code === PINNED_CODE) - (a.code === PINNED_CODE);
+          var pinnedDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
           return pinnedDiff || a.name.localeCompare(b.name);
         });
 
@@ -1145,9 +1177,7 @@
       async function refresh() {
         if (!state.user) return;
         try {
-          var res = await fetch(BASE + 'api/queue', { cache: 'no-store' });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          state.queue = await res.json();
+          state.queue = await api('/api/staff/queue');
           checkNewArrivals(state.queue);
           render();
           loadHistory();

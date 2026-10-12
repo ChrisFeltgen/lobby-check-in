@@ -10,6 +10,9 @@ const db = require('./db');
 const auth = require('./auth');
 const reports = require('./reports');
 const appSettings = require('./settings');
+const catalog = require('./catalog');
+const privacy = require('./privacy');
+const { UI_STRINGS } = require('./ui-strings');
 
 const PORT = process.env.PORT || 3000;
 // Set BASE_PATH (e.g. /virtual-queue) when the app is served under a sub-path. Leave empty for a domain root.
@@ -46,7 +49,7 @@ if (BASE_PATH) {
 // Most routes take small JSON bodies. The logo upload is the one route that takes a larger image.
 const smallJson = express.json({ limit: '10kb' });
 const logoJson = express.json({ limit: '500kb' });
-app.use((req, res, next) => (req.path === '/api/admin/logo' ? logoJson : smallJson)(req, res, next));
+app.use((req, res, next) => (req.path === '/api/admin/logo' || req.path === '/api/admin/translations' ? logoJson : smallJson)(req, res, next));
 app.use((req, res, next) => {
   req.cookies = auth.parseCookies(req.headers.cookie);
   next();
@@ -67,6 +70,12 @@ const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 // Tell every connected kiosk, staff screen and monitor to refresh.
 function notify() {
   io.emit('queue:changed');
+}
+
+// A change to services, groups, languages or wording: the kiosk and monitors re-read the catalogue as well.
+function notifyCatalog() {
+  io.emit('catalog:changed');
+  notify();
 }
 
 function cookiePath() { return BASE_PATH || '/'; }
@@ -135,19 +144,232 @@ function requireRole(minRole) {
 }
 
 const SERVICE_CODE = /^[A-Z0-9]{1,10}$/;
-// Appointment services ask who the visitor is seeing and what time they are booked for.
-const APPOINTMENT_CODE = 'AC';
+// A service that asks for an appointment (set in Services & languages) wants who the visitor is seeing and the
+// time they are booked for.
 const APPOINTMENT_TIME = /^(1[0-2]|0?[1-9]):[0-5][0-9] (AM|PM)$/;
 const TICKET_ACTIONS = ['call', 'complete', 'remove', 'return'];
 const USERNAME_RE = /^[a-z0-9._-]{3,40}$/i;
 const ROLES = ['staff', 'manager', 'admin'];
 
 // Public: kiosk and monitor
+// The language to use for a request: one that is switched on, otherwise English.
+async function languageFor(code) {
+  if (!code || code === 'en') return 'en';
+  const langs = await db.listLanguages();
+  return langs.some((l) => l.code === code && l.enabled) ? code : 'en';
+}
+
+async function departmentList() {
+  return (await db.listGroups('en')).map((g) => ({ id: g.id, label: g.label }));
+}
+
+// Active services. With ?lang=, names and descriptions come in that language where translated.
 app.get('/api/services', wrap(async (req, res) => {
-  res.json(await db.listServices());
+  res.json(await db.listServices(await languageFor(String(req.query.lang || ''))));
 }));
 
+// Department groups and the languages the kiosk offers.
+app.get('/api/catalog', wrap(async (req, res) => {
+  const lang = await languageFor(String(req.query.lang || ''));
+  const languages = (await db.listLanguages()).filter((l) => l.enabled);
+  res.json({ groups: await db.listGroups(lang), languages });
+}));
+
+// The kiosk's wording for one language. Anything not translated falls back to English.
+app.get('/api/i18n/:lang', wrap(async (req, res) => {
+  const lang = await languageFor(req.params.lang);
+  const strings = { ...UI_STRINGS.en };
+  if (lang !== 'en') {
+    const tr = await db.getTranslations(lang);
+    for (const key of Object.keys(strings)) {
+      const value = tr[catalog.keys.ui(key)];
+      if (value) strings[key] = value;
+    }
+  }
+  res.json({ lang, strings });
+}));
+
+// ---- Services & languages (admin): services, department groups, languages and translations ----
+
+app.get('/api/admin/catalog', requireRole('admin'), wrap(async (req, res) => {
+  res.json({
+    services: await db.listCatalogServices(),
+    groups: await db.listGroups('en'),
+    languages: await db.listLanguages(),
+    iconNames: catalog.ICON_NAMES,
+  });
+}));
+
+app.post('/api/admin/services', requireRole('admin'), wrap(async (req, res) => {
+  const groupIds = (await db.listGroups('en')).map((g) => g.id);
+  const checked = catalog.validateService(req.body, groupIds, true);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  const existing = (await db.listCatalogServices()).find((s) => s.code === checked.values.code);
+  if (existing) return res.status(409).json({ error: 'A service with that code already exists' });
+  await db.createService(checked.values);
+  await db.logAudit(req.user.displayName, 'service.create', checked.values.code, checked.values.name);
+  notifyCatalog();
+  res.status(201).json({ ok: true });
+}));
+
+app.patch('/api/admin/services/:code', requireRole('admin'), wrap(async (req, res) => {
+  const code = req.params.code;
+  if (!catalog.CODE_RE.test(code)) return res.status(400).json({ error: 'Invalid service' });
+  const groupIds = (await db.listGroups('en')).map((g) => g.id);
+  const checked = catalog.validateService(req.body, groupIds, false);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  if (!Object.keys(checked.values).length) return res.status(400).json({ error: 'Nothing to change' });
+  if (!(await db.updateService(code, checked.values))) return res.status(404).json({ error: 'Service not found' });
+  await db.logAudit(req.user.displayName, 'service.update', code, Object.keys(checked.values).join(', '));
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+// The kiosk layout: which services sit on which row, and in what order. Sent whole, so it is saved all or nothing.
+app.put('/api/admin/layout', requireRole('admin'), wrap(async (req, res) => {
+  const active = (await db.listCatalogServices()).filter((s) => s.active).map((s) => s.code);
+  const checked = catalog.validateLayout(req.body, active);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  await db.setLayout(checked.rows);
+  await db.logAudit(req.user.displayName, 'layout.update', 'Kiosk layout', checked.rows.map((r) => r.join(' ')).join(' / '));
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+// Takes ids that no longer exist out of the left and right monitor panels in Settings. A panel left with nothing
+// goes back to its default.
+async function pruneMonitorPanels(removed) {
+  const values = appSettings.parseSettings(await db.getSettings());
+  for (const key of ['monitor_left', 'monitor_right']) {
+    const next = values[key].filter((id) => !removed.includes(id));
+    if (next.length === values[key].length) continue;
+    await db.setSetting(key, next.length ? appSettings.toStored(key, next) : '');
+  }
+}
+
+app.delete('/api/admin/services/:code', requireRole('admin'), wrap(async (req, res) => {
+  const code = req.params.code;
+  if (!catalog.CODE_RE.test(code)) return res.status(400).json({ error: 'Invalid service' });
+  const existing = (await db.listCatalogServices()).find((s) => s.code === code);
+  const result = await db.deleteService(code);
+  if (!result.ok) return res.status(409).json({ error: 'This service has customers on record, so it cannot be deleted. Turn it off instead.' });
+  await db.logAudit(req.user.displayName, 'service.delete', code, existing ? existing.name : null);
+  await pruneMonitorPanels([code]);
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+app.post('/api/admin/groups', requireRole('admin'), wrap(async (req, res) => {
+  const ids = (await db.listGroups('en')).map((g) => g.id);
+  const checked = catalog.validateGroup(req.body, ids, true);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  await db.createGroup(checked.values);
+  await db.logAudit(req.user.displayName, 'group.create', checked.values.id, checked.values.label);
+  notifyCatalog();
+  res.status(201).json({ ok: true });
+}));
+
+app.patch('/api/admin/groups/:id', requireRole('admin'), wrap(async (req, res) => {
+  const id = req.params.id;
+  const ids = (await db.listGroups('en')).map((g) => g.id);
+  if (!ids.includes(id)) return res.status(404).json({ error: 'Group not found' });
+  const checked = catalog.validateGroup(req.body, ids, false);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  if (!Object.keys(checked.values).length) return res.status(400).json({ error: 'Nothing to change' });
+  await db.updateGroup(id, checked.values);
+  await db.logAudit(req.user.displayName, 'group.update', id, Object.keys(checked.values).join(', '));
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+app.delete('/api/admin/groups/:id', requireRole('admin'), wrap(async (req, res) => {
+  const ids = (await db.listGroups('en')).map((g) => g.id);
+  if (!ids.includes(req.params.id)) return res.status(404).json({ error: 'Group not found' });
+  const result = await db.deleteGroup(req.params.id);
+  if (!result.ok) return res.status(409).json({ error: 'Move or delete the services in this group first.' });
+  await db.logAudit(req.user.displayName, 'group.delete', req.params.id, null);
+  await pruneMonitorPanels([req.params.id]);
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+app.post('/api/admin/languages', requireRole('admin'), wrap(async (req, res) => {
+  const codes = (await db.listLanguages()).map((l) => l.code);
+  const checked = catalog.validateLanguage(req.body, codes, true);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  await db.createLanguage(checked.values);
+  await db.logAudit(req.user.displayName, 'language.create', checked.values.code, checked.values.name);
+  notifyCatalog();
+  res.status(201).json({ ok: true });
+}));
+
+app.patch('/api/admin/languages/:code', requireRole('admin'), wrap(async (req, res) => {
+  const code = req.params.code;
+  const codes = (await db.listLanguages()).map((l) => l.code);
+  if (!codes.includes(code)) return res.status(404).json({ error: 'Language not found' });
+  if (code === 'en' && req.body && req.body.enabled === false) return res.status(400).json({ error: 'English cannot be turned off' });
+  const checked = catalog.validateLanguage(req.body, codes, false);
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  if (!Object.keys(checked.values).length) return res.status(400).json({ error: 'Nothing to change' });
+  await db.updateLanguage(code, checked.values);
+  await db.logAudit(req.user.displayName, 'language.update', code, Object.keys(checked.values).join(', '));
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+app.delete('/api/admin/languages/:code', requireRole('admin'), wrap(async (req, res) => {
+  const code = req.params.code;
+  if (code === 'en') return res.status(400).json({ error: 'English cannot be removed' });
+  const codes = (await db.listLanguages()).map((l) => l.code);
+  if (!codes.includes(code)) return res.status(404).json({ error: 'Language not found' });
+  await db.deleteLanguage(code);
+  await db.logAudit(req.user.displayName, 'language.delete', code, null);
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+// Every translatable item for one language, with its English text alongside.
+app.get('/api/admin/translations', requireRole('admin'), wrap(async (req, res) => {
+  const lang = String(req.query.lang || '');
+  const codes = (await db.listLanguages()).map((l) => l.code);
+  if (lang === 'en' || !codes.includes(lang)) return res.status(400).json({ error: 'Choose a language to translate' });
+  const tr = await db.getTranslations(lang);
+  const items = [];
+  for (const s of await db.listCatalogServices()) {
+    items.push({ key: catalog.keys.serviceName(s.code), section: 'Services', label: s.code + ' name', english: s.name, value: tr[catalog.keys.serviceName(s.code)] || '' });
+    items.push({ key: catalog.keys.serviceDescription(s.code), section: 'Services', label: s.code + ' description', english: s.description, value: tr[catalog.keys.serviceDescription(s.code)] || '' });
+  }
+  for (const g of await db.listGroups('en')) {
+    items.push({ key: catalog.keys.groupLabel(g.id), section: 'Department groups', label: g.id, english: g.englishLabel, value: tr[catalog.keys.groupLabel(g.id)] || '' });
+  }
+  for (const k of Object.keys(UI_STRINGS.en)) {
+    items.push({ key: catalog.keys.ui(k), section: 'Kiosk wording', label: k, english: UI_STRINGS.en[k], value: tr[catalog.keys.ui(k)] || '' });
+  }
+  res.json({ lang, items });
+}));
+
+app.put('/api/admin/translations', requireRole('admin'), wrap(async (req, res) => {
+  const body = req.body || {};
+  const lang = String(body.lang || '');
+  const codes = (await db.listLanguages()).map((l) => l.code);
+  if (lang === 'en' || !codes.includes(lang)) return res.status(400).json({ error: 'Choose a language to translate' });
+  const checked = catalog.validateTranslations(body.values, await db.knownTranslationKeys());
+  if (checked.error) return res.status(400).json({ error: checked.error });
+  await db.setTranslations(lang, checked.changes);
+  await db.logAudit(req.user.displayName, 'translations.update', lang, Object.keys(checked.changes).length + ' item(s)');
+  notifyCatalog();
+  res.json({ ok: true });
+}));
+
+// ---- App settings (kiosk, monitor, security, branding) ----
+
+// Public, for the lobby monitor: customers as first name and last initial only.
 app.get('/api/queue', wrap(async (req, res) => {
+  res.json(privacy.publicQueue(await db.queueSnapshot()));
+}));
+
+// The same queue with everything staff need: full names and appointment details.
+app.get('/api/staff/queue', requireRole('staff'), wrap(async (req, res) => {
   res.json(await db.queueSnapshot());
 }));
 
@@ -184,7 +406,7 @@ app.post('/api/tickets', wrap(async (req, res) => {
   if (!availability.available) return res.status(409).json({ error: availability.message });
 
   let appointment = null;
-  if (serviceId === APPOINTMENT_CODE) {
+  if (availability.asksAppointment) {
     const withName = String((req.body.appointment && req.body.appointment.with) || '').trim().slice(0, 100);
     const time = String((req.body.appointment && req.body.appointment.time) || '').trim();
     if (!withName) return res.status(400).json({ error: 'Enter who you are here to see' });
@@ -498,7 +720,9 @@ const reportRange = wrap(async (req, res) => {
   // Real calendar dates only, in order, and within the cap (see reports.js).
   const problem = reports.rangeProblem(from, to);
   if (problem) return res.status(400).json({ error: problem });
-  res.json({ from, to, tickets: await db.ticketsForRange(from, to) });
+  // Names for every service, turned off or not, so a report still reads "Zoning" for a service that has since been turned off.
+  const services = (await db.listCatalogServices()).map((s) => ({ code: s.code, name: s.name }));
+  res.json({ from, to, tickets: await db.ticketsForRange(from, to), services });
 });
 app.get('/api/reports/range', requireRole('manager'), reportRange);
 // The single-day address the Reports page used before the date range. A copy of manage.html
@@ -678,14 +902,15 @@ app.get('/api/admin/app-settings', requireRole('admin'), wrap(async (req, res) =
   });
   res.json({
     values, definitions, services,
-    departments: appSettings.DEPARTMENT_GROUPS,
+    departments: await departmentList(),
     logoUrl: stored.logo_data_url ? 'api/branding/logo?v=' + (stored.logo_updated_at || '0') : null,
   });
 }));
 
 app.put('/api/admin/app-settings', requireRole('admin'), wrap(async (req, res) => {
   const services = await db.listServices();
-  const result = appSettings.validateSettings(req.body, services.map((s) => s.code));
+  const groups = (await db.listGroups('en')).map((g) => ({ id: g.id, codes: g.codes }));
+  const result = appSettings.validateSettings(req.body, services.map((s) => s.code), groups);
   if (result.error) return res.status(400).json({ error: result.error });
   const stored = await db.getSettings();
   const before = appSettings.parseSettings(stored);
@@ -741,7 +966,7 @@ app.post('/api/admin/cleanup', requireRole('admin'), wrap(async (req, res) => {
 
 // Runs the automated test files (the same ones `npm test` runs) and returns their output. The list
 // is fixed in the code, so nothing from the request reaches the command.
-const TEST_FILES = ['tests/auth.test.js', 'tests/availability.test.js', 'tests/reports.test.js', 'tests/schema.test.js', 'tests/settings.test.js', 'tests/http.test.js'];
+const TEST_FILES = ['tests/auth.test.js', 'tests/availability.test.js', 'tests/reports.test.js', 'tests/schema.test.js', 'tests/settings.test.js', 'tests/http.test.js', 'tests/catalog.test.js', 'tests/privacy.test.js'];
 app.post('/api/admin/tests', requireRole('admin'), wrap(async (req, res) => {
   await db.logAudit(req.user.displayName, 'tests.run', 'Automated tests', null);
   execFile(process.execPath, ['--test', ...TEST_FILES], { cwd: __dirname, timeout: 120000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },

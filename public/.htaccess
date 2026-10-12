@@ -4,4 +4,10 @@
   <FilesMatch "\.html$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
+
+  # Browser protections for the pages and files. The app sends the same headers for its own
+  # responses; the host serves the HTML pages directly, so they need them here too.
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "same-origin"
 </IfModule>

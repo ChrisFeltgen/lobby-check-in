@@ -93,9 +93,10 @@ function parseSettings(stored) {
 
 // Checks a settings change from the admin form. `serviceCodes` are the active service codes, which are
 // the only codes a monitor panel may list. Returns { changes } with typed values, or { error }.
-function validateSettings(body, serviceCodes) {
+function validateSettings(body, serviceCodes, groups) {
+  const departments = groups || DEPARTMENT_GROUPS;
   const changes = {};
-  const allowedKeys = new Set([...DEPARTMENT_GROUPS.map((g) => g.id), ...serviceCodes]);
+  const allowedKeys = new Set([...departments.map((g) => g.id), ...serviceCodes]);
   const input = body || {};
   for (const key of Object.keys(input)) {
     const d = DEFINITIONS[key];
@@ -124,7 +125,7 @@ function validateSettings(body, serviceCodes) {
       const bad = unique.find((k) => !allowedKeys.has(k));
       if (bad) return { error: 'Unknown department: ' + bad };
       // A department and one of its own services would be drawn twice on the monitor.
-      for (const group of DEPARTMENT_GROUPS) {
+      for (const group of departments) {
         const clash = group.codes.find((code) => unique.includes(code));
         if (unique.includes(group.id) && clash) return { error: 'Choose ' + group.label + ' or its service ' + clash + ', not both' };
       }

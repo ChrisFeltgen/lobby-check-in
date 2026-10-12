@@ -178,6 +178,7 @@
 
   <script src="socket.io/socket.io.js"></script>
   <script src="app-settings.js"></script>
+  <script src="icons.js"></script>
   <script>
     (function () {
       var BASE = location.pathname.replace(/[^/]*$/, '');
@@ -189,51 +190,38 @@
       var pageSize = MAX_PAGE;
       var CALL_MS;            // how long the Now Calling notice stays on screen (from Settings)
 
-      // Services that share a department are one department card, with each service keeping its
-      // own queue and numbering.
-      var GROUPS = {
-        building: { label: 'Building Dept.', codes: ['BPI', 'CR', 'BSC'] },
-        planning: { label: 'Planning & Zoning', codes: ['UF', 'ZD'] },
-        records: { label: 'Records & Alarms', codes: ['LS', 'AB'] }
-      };
-      var GROUP_BY_CODE = {};
-      Object.keys(GROUPS).forEach(function (gid) {
-        GROUPS[gid].codes.forEach(function (code) { GROUP_BY_CODE[code] = gid; });
-      });
+      // Department groups come from the server (see Services & languages), with their icons and colours.
+      // Each service's icon and colour come with the queue data. The drawings are in icons.js.
+      var GROUPS = {};          // group id -> { label, icon, color, codes }
+      var GROUP_BY_CODE = {};   // service code -> group id
+      var SERVICE_ICON = {};    // service code -> icon name, from the queue data
+      var DEFAULT_UNIT_COLOR = '#3b5bdb';
 
-      // Which departments each monitor shows, in order: a group id (above) or a single service
-      // code. Open monitor.html?panel=left or ?panel=right. Set in Settings → Lobby monitor, and
-      // loaded below before the first draw. With no panel, every department shows.
+      // Which departments each monitor shows, in order: a group id or a single service code. Open
+      // monitor.html?panel=left or ?panel=right. Set in Settings → Lobby monitor. With no panel, every department shows.
       var panel = new URLSearchParams(location.search).get('panel');
       var ORDER = null;
 
-      // Lucide-style icon paths, one per service.
-      var ICON_PATHS = {
-        BPI: '<path d="M6 22V4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v18Z"/><path d="M14 9h4a1 1 0 0 1 1 1v12"/><path d="M10 9h.01M10 13h.01M10 17h.01"/><path d="M2 22h20"/>',
-        BSC: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
-        CR: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
-        CE: '<path d="M20 13c0 5-3.5 7.5-7.5 9-.3.1-.7.1-1 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
-        BTD: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
-        UF: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
-        ZD: '<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894L8.106 3.447a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15.236"/><path d="M9 3.764v15.236"/>',
-        LS: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="16.5" cy="17.5" r="2.5"/><path d="m18.5 19.5 2 2"/>',
-        AB: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
-        AC: '<path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
-      };
-      var GROUP_ICON_PATHS = { building: ICON_PATHS.BPI, planning: ICON_PATHS.ZD, records: ICON_PATHS.LS };
+      function loadCatalog() {
+        return fetch(BASE + 'api/catalog', { cache: 'no-store' })
+          .then(function (res) { if (!res.ok) throw new Error('catalog'); return res.json(); })
+          .then(function (c) {
+            GROUPS = {};
+            GROUP_BY_CODE = {};
+            c.groups.forEach(function (g) {
+              GROUPS[g.id] = { label: g.label, icon: g.icon, color: g.color, codes: g.codes };
+              g.codes.forEach(function (code) { GROUP_BY_CODE[code] = g.id; });
+            });
+          })
+          .catch(function () { /* keep the groups already loaded until the next check */ });
+      }
+
+      function iconPath(name) {
+        return window.ICON_PATHS[name] || window.ICON_PATHS.calendar;
+      }
+
       var MEGAPHONE_PATH = '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>';
       var PEOPLE_PATH = '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
-
-      // One accent color per department, used in its card header and status line.
-      var UNIT_COLOR = {
-        building: '#2f6fd6',
-        records: '#7c4fd1',
-        planning: '#2f9e6f',
-        CE: '#c2662a',
-        BTD: '#b23b7a',
-        AC: '#1fae8e'
-      };
-      var DEFAULT_UNIT_COLOR = '#3b5bdb';
 
       function $(id) { return document.getElementById(id); }
 
@@ -251,7 +239,7 @@
         wrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
         return wrap.firstChild;
       }
-      function iconFor(code) { return svgIcon(ICON_PATHS[code] || ICON_PATHS.AC); }
+      function iconFor(code) { return svgIcon(iconPath(SERVICE_ICON[code])); }
       function discFor(inner) {
         var d = el('span', 'icon-disc');
         d.appendChild(inner);
@@ -270,13 +258,13 @@
           return services.find(function (s) { return s.code === code; });
         }).filter(Boolean);
         if (!members.length) return null;
-        return { key: gid, label: group.label, iconInner: GROUP_ICON_PATHS[gid] || ICON_PATHS.AC, color: UNIT_COLOR[gid] || DEFAULT_UNIT_COLOR, members: members };
+        return { key: gid, label: group.label, iconInner: iconPath(group.icon), color: group.color || DEFAULT_UNIT_COLOR, members: members };
       }
 
       // Icons are stored as markup, not as elements, so each card gets its own copy. A single
       // element can't sit in two places at once (the header and the body of one card).
       function soloUnit(svc) {
-        return { key: svc.code, label: svc.name, iconInner: ICON_PATHS[svc.code] || ICON_PATHS.AC, color: UNIT_COLOR[svc.code] || DEFAULT_UNIT_COLOR, members: [svc] };
+        return { key: svc.code, label: svc.name, iconInner: iconPath(svc.icon), color: svc.color || DEFAULT_UNIT_COLOR, members: [svc] };
       }
 
       function buildUnits(services) {
@@ -604,6 +592,7 @@
       var scrollTimer = null;
 
       function render(services) {
+        services.forEach(function (s) { SERVICE_ICON[s.code] = s.icon; });
         var units = buildUnits(services);
         var serving = 0, waiting = 0;
         units.forEach(function (u) {
@@ -656,14 +645,19 @@
         refresh();
       }
       window.appSettingsReady.then(function (s) {
-        applyMonitorSettings(s);
-        window.watchAppSettings(applyMonitorSettings);
-
-        if (window.io) {
-          io({ path: BASE + 'socket.io' }).on('queue:changed', refresh);
-        }
-        setInterval(refresh, 30000);
-        refresh();
+        loadCatalog().then(function () {
+          applyMonitorSettings(s);
+          window.watchAppSettings(applyMonitorSettings);
+          if (window.io) {
+            var socket = io({ path: BASE + 'socket.io' });
+            socket.on('queue:changed', refresh);
+            // Groups, icons or colours were edited in Services & languages.
+            socket.on('catalog:changed', function () { loadCatalog().then(refresh); });
+          }
+          setInterval(refresh, 30000);
+          // Groups change rarely; re-read them once a minute too, for hosts where the live connection does not get through.
+          setInterval(function () { loadCatalog().then(refresh); }, 60000);
+        });
       });
     })();
   </script>

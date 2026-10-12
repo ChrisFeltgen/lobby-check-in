@@ -122,3 +122,18 @@ CREATE TABLE IF NOT EXISTS translations (
   value TEXT NOT NULL,
   PRIMARY KEY (lang, item_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Access links for the kiosk and monitor screens. Only a hash of each link's secret key is kept here, so a copy of the
+-- database opens nothing. Revoking a link sets revoked_at, and the screens using it lock straight away.
+CREATE TABLE IF NOT EXISTS screen_links (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  scope ENUM('kiosk','monitor') NOT NULL,
+  panel ENUM('full','left','right') NOT NULL DEFAULT 'full',
+  token_hash CHAR(64) NOT NULL,
+  created_at DATETIME NOT NULL,
+  created_by VARCHAR(100) NOT NULL,
+  last_used_at DATETIME NULL,
+  revoked_at DATETIME NULL,
+  UNIQUE KEY uq_screen_links_hash (token_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

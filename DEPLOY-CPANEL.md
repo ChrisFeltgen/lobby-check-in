@@ -40,7 +40,7 @@ Keep this list in a safe place (a password manager is best). **Don't** email it 
 4. Open that folder.
 5. Click **Upload**, and upload everything from your project folder **except** the folder named `node_modules` and the file named `node_modules.tar.gz`.
    - You can upload the files one at a time or drag them in.
-   - Make sure `server.js`, `db.js`, `auth.js`, `availability.js`, `package.json`, the `db` folder and the `public` folder all end up inside `virtual-queue`.
+   - Make sure `server.js`, `db.js`, `package.json`, the `db` folder, the `lib` folder and the `public` folder all end up inside `virtual-queue`.
 
 **Check:** inside `virtual-queue` you should see `server.js` and `package.json`.
 
@@ -112,10 +112,13 @@ These settings are kept on the host, not in the files you uploaded.
 | `DB_USER` | The full database username from step 2 |
 | `DB_PASSWORD` | The database password from step 2 |
 | `BASE_PATH` | `/virtual-queue` (the folder name, with a slash in front) |
+| `TZ` | Optional but worth setting: your time zone, for example `America/New_York`. Recurring closures and the end-of-day time follow the app's clock, so this keeps them on local time when the host's clock is set to another zone. |
 
 **Making the SESSION_SECRET:** it needs to be a long mix of letters and numbers, at least 40 characters. Don't use a word or a name. If you can't make one, use a password generator website from a reputable source, and copy the result. Keep it the same forever: changing it signs everyone out.
 
 **Check:** no value has a space before or after it.
+
+After the first start, an admin can open **Management → Health and Audit → Run health check**. It says whether the database and the app agree on the time. If they don't, closures and "today" can be hours out: ask the host to set the database time zone, or set `TZ` as above.
 
 ---
 
@@ -141,7 +144,7 @@ These settings are kept on the host, not in the files you uploaded.
 6. Create an account for each real staff member (**Add an account**). Leave **Require user to change password on next sign-on** ticked, so each person picks their own password when they first sign in.
 7. Change the admin password on **My account** (top right), or delete the two `ADMIN_` settings in step 5 and restart the app.
 
-**Check:** you can see the Open & close, Staff, Reports and Settings tabs.
+**Check:** you can see the Operations, Staff, Reports, Service Configuration, Settings, Security and Health and Audit tabs.
 
 ---
 
@@ -181,6 +184,8 @@ For the TV, you can use `monitor.html?panel=left` or `monitor.html?panel=right` 
 | A page shows an old version after an update | Press Ctrl+Shift+R once. |
 | Changes take up to 30 seconds to show on the screens | The host isn't passing live updates through. The screens still refresh on their own. |
 | Nothing loads at all | Check that **Restart** completed and that `server.js` is the startup file. |
+| Closures start or end at the wrong time, or the health check says the clocks differ | The host's time zone is not yours. Set `TZ` (step 5), and ask the host to set the database time zone if the health check still shows a difference. |
+| Every page shows **404 Not Found** | The app is stopped. On the Node.js App page click **Start** (or **Restart**). Screens that were open before it stopped say the connection is lost and start again by themselves; ones that have been opened on that computer before still open and wait. |
 
 If you're stuck, write down the exact message you see (take a screenshot, but don't include passwords) and ask for help.
 
@@ -191,6 +196,6 @@ If you're stuck, write down the exact message you see (take a screenshot, but do
 - Never share your passwords or `SESSION_SECRET`.
 - Give every staff member their own account. When someone leaves, **disable** their account in Management instead of deleting it.
 - Use the `https://` addresses only.
-- The kiosk and TV screens are public. They show customer names, so only place them where that's acceptable.
-- Admins can check the app from **Management → Health & audit**: run the health check and database check, and review the audit log for who changed what.
+- The kiosk and TV screens are public. The TV shows each customer's first name and last initial (for example "Jane S."), so only place the screens where that's acceptable.
+- Admins can check the app from **Management → Health and Audit**: run the health check and database check, and review the audit log for who changed what.
 - Sign out on shared computers. Sessions last 12 hours.

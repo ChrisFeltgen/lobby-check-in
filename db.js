@@ -3,12 +3,12 @@
 const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
-const { resolveAvailability, isScheduleActiveAt } = require('./availability');
-const catalog = require('./catalog');
-const { seedCatalog, seedAddedWording } = require('./catalog-seed');
+const { resolveAvailability, isScheduleActiveAt } = require('./lib/availability');
+const catalog = require('./lib/catalog');
+const { seedCatalog, seedAddedWording } = require('./lib/catalog-seed');
 // Services are shown in kiosk rows, and in order within a row. One with no row yet goes last.
 const SERVICE_ORDER = 'kiosk_row IS NULL, kiosk_row, sort_order, name';
-const { UI_STRINGS } = require('./ui-strings');
+const { UI_STRINGS } = require('./lib/ui-strings');
 
 // All database access lives in this file so the rest of the app stays engine-agnostic.
 const pool = mysql.createPool({
@@ -83,12 +83,22 @@ function splitStatements(sql) {
   return sql.split(';').map((s) => s.trim()).filter(Boolean);
 }
 
+// A statement from schema.sql without the comment lines written above it.
+function statementCode(statement) {
+  return statement.split('\n').filter((line) => !/^\s*--/.test(line)).join('\n').trim();
+}
+
+// Whether a statement creates a table. A comment above it makes no difference: every table must exist before a
+// column is added to one, and on a new, empty database the users table is only there if this sees past its comment.
+function isCreateStatement(statement) {
+  return /^CREATE\b/i.test(statementCode(statement));
+}
+
 // The statements in schema.sql that put the default services in place. They belong to the first start only:
 // once the catalogue has been set up, an admin may delete a default service or reuse a retired code, and a
 // later restart must not undo that.
 function isDefaultServiceStatement(statement) {
-  const code = statement.split('\n').filter((line) => !/^\s*--/.test(line)).join('\n').trim();
-  return /^(INSERT\s+(IGNORE\s+)?INTO|UPDATE)\s+services\b/i.test(code);
+  return /^(INSERT\s+(IGNORE\s+)?INTO|UPDATE)\s+services\b/i.test(statementCode(statement));
 }
 
 // Gives every service without a row one, so the kiosk looks as it did before rows could be chosen: the active
@@ -116,7 +126,7 @@ async function init() {
   const statements = splitStatements(sql);
   const conn = await pool.getConnection();
   try {
-    for (const stmt of statements.filter((s) => s.startsWith('CREATE'))) {
+    for (const stmt of statements.filter(isCreateStatement)) {
       await conn.query(stmt);
     }
     await ensureColumn(conn, 'services', 'route', 'VARCHAR(100) NULL');
@@ -135,6 +145,7 @@ async function init() {
     await ensureColumn(conn, 'services', 'color', 'VARCHAR(7) NULL');
     await ensureColumn(conn, 'services', 'group_id', 'VARCHAR(40) NULL');
     await ensureColumn(conn, 'services', 'kiosk_row', 'INT NULL');
+    await ensureColumn(conn, 'screen_links', 'panel', "ENUM('full','left','right') NOT NULL DEFAULT 'full'");
     // Before these two columns, the appointment questions and the pinned queue belonged to the code AC alone.
     // An install that already has that service keeps both behaviours; a new one gets them when the catalogue is seeded.
     const addedAppointment = await ensureColumn(conn, 'services', 'asks_appointment', 'TINYINT(1) NOT NULL DEFAULT 0');
@@ -142,7 +153,7 @@ async function init() {
     if (addedAppointment || addedPinned) await conn.query("UPDATE services SET asks_appointment = 1, pinned = 1 WHERE code = 'AC'");
     await ensureServingStatus(conn);
     const [[seeded]] = await conn.query("SELECT COUNT(*) AS n FROM app_settings WHERE setting_key = 'catalog_seeded'");
-    for (const stmt of statements.filter((s) => !s.startsWith('CREATE'))) {
+    for (const stmt of statements.filter((s) => !isCreateStatement(s))) {
       if (seeded.n && isDefaultServiceStatement(stmt)) continue;
       await conn.query(stmt);
     }
@@ -205,7 +216,7 @@ async function listServices(lang) {
   }));
 }
 
-// Every service, including inactive ones, for the Services & languages page. English only.
+// Every service, including inactive ones, for the Service Configuration page. English only.
 async function listCatalogServices() {
   const [rows] = await pool.query(
     `SELECT s.code, s.name, s.description, s.icon, s.color, s.route, s.group_id, s.active, s.sort_order, s.kiosk_row, s.asks_appointment, s.pinned,
@@ -581,7 +592,7 @@ async function transferTicket(id, serviceCode) {
   const [[svc]] = await pool.query('SELECT code FROM services WHERE code = ? AND active = 1', [serviceCode]);
   if (!svc) return false;
   const [result] = await pool.query(
-    `UPDATE tickets SET service_code = ?, status = 'waiting', counter = NULL, called_at = NULL
+    `UPDATE tickets SET service_code = ?, status = 'waiting', counter = NULL, called_at = NULL, called_by = NULL
      WHERE id = ? AND status IN ('waiting', 'called', 'serving')`,
     [serviceCode, id]
   );
@@ -643,13 +654,13 @@ async function countRecentLoginFailures(username, minutes) {
   return Number(row.n) || 0;
 }
 
-// Removes audit rows older than `days`. The caller makes sure the window is long enough for lockouts.
 // Moves every ticket still waiting, called or being served to removed. Used by the end-of-day close.
 async function closeOpenTickets() {
   const [result] = await pool.query("UPDATE tickets SET status = 'removed', completed_at = NOW() WHERE status IN ('waiting', 'called', 'serving')");
   return result.affectedRows;
 }
 
+// Removes audit rows older than `days`. The caller makes sure the window is long enough for lockouts.
 async function cleanupAudit(days) {
   const [result] = await pool.query('DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL ? DAY', [days]);
   return result.affectedRows;
@@ -699,7 +710,7 @@ async function cleanupOldTickets(days, action) {
 // ---- Database check ----
 // The tables and columns the app depends on. A missing one usually means an upload was incomplete
 // or the database user lacked the privileges to create it on startup.
-const REQUIRED_TABLES = ['services', 'service_counters', 'tickets', 'service_schedules', 'users', 'audit_log', 'app_settings', 'service_groups', 'languages', 'translations'];
+const REQUIRED_TABLES = ['services', 'service_counters', 'tickets', 'service_schedules', 'users', 'audit_log', 'app_settings', 'service_groups', 'languages', 'translations', 'screen_links'];
 const REQUIRED_COLUMNS = {
   services: ['code', 'name', 'manual_override', 'manual_override_expires_at', 'description', 'icon', 'color', 'group_id', 'kiosk_row', 'asks_appointment', 'pinned'],
   tickets: ['service_code', 'status', 'created_at', 'called_by', 'completed_at'],
@@ -709,7 +720,7 @@ const REQUIRED_COLUMNS = {
 };
 
 // Runs a set of checks against the database and returns one result per check, each with a plain
-// description. It never changes real data: the write check uses a temporary table that is dropped.
+// description. It never changes real data: the write check adds one row and then undoes it.
 async function databaseCheck() {
   const checks = [];
   const started = Date.now();
@@ -742,14 +753,17 @@ async function databaseCheck() {
     detail: missingColumns.length ? 'Missing: ' + missingColumns.join(', ') : 'All expected columns present',
   });
 
-  // Uses one connection, because a temporary table only exists on the connection that created it.
+  // A real write that is then undone: one row goes into a table the app already uses, inside a transaction that is
+  // rolled back, so nothing is kept. This needs only the INSERT privilege the app has anyway. (A temporary table
+  // would need CREATE TEMPORARY TABLES as well, which the setup instructions do not ask for.)
   const conn = await pool.getConnection();
   try {
-    await conn.query('CREATE TEMPORARY TABLE vq_write_check (id INT)');
-    await conn.query('INSERT INTO vq_write_check (id) VALUES (1)');
-    await conn.query('DROP TEMPORARY TABLE vq_write_check');
-    checks.push({ name: 'Write access', ok: true, detail: 'Can create and write temporary tables' });
+    await conn.beginTransaction();
+    await conn.query("INSERT INTO app_settings (setting_key, setting_value) VALUES ('__write_check__', '1')");
+    await conn.rollback();
+    checks.push({ name: 'Write access', ok: true, detail: 'Can write to the database' });
   } catch (err) {
+    await conn.rollback().catch(() => {});
     checks.push({ name: 'Write access', ok: false, detail: 'Could not write: ' + (err.code || err.message) });
   } finally {
     conn.release();
@@ -898,6 +912,8 @@ async function listSchedules(serviceCode) {
 }
 
 async function createSchedule(serviceCode, data) {
+  const [[known]] = await pool.query('SELECT COUNT(*) AS n FROM services WHERE code = ?', [serviceCode]);
+  if (!known.n) return null;
   const [result] = await pool.query(
     `INSERT INTO service_schedules (service_code, message, recurrence, weekday, nth_weeks, start_time, end_time, active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
@@ -983,11 +999,70 @@ async function listServicesAdmin() {
   });
 }
 
+// ---- Access links for the kiosk and monitor screens ----
+// Only a hash of each link's key is stored. Revoking keeps the row, so the list can show that the link was revoked.
+
+function toScreenLink(row) {
+  return {
+    id: row.id, name: row.name, scope: row.scope, panel: row.panel || 'full', createdAt: row.created_at, createdBy: row.created_by,
+    lastUsedAt: row.last_used_at, revokedAt: row.revoked_at,
+  };
+}
+
+const SCREEN_LINK_COLUMNS = 'id, name, scope, panel, created_at, created_by, last_used_at, revoked_at';
+
+async function listScreenLinks() {
+  const [rows] = await pool.query('SELECT ' + SCREEN_LINK_COLUMNS + ' FROM screen_links ORDER BY revoked_at IS NOT NULL, scope, name');
+  return rows.map(toScreenLink);
+}
+
+async function getScreenLink(id) {
+  const [[row]] = await pool.query('SELECT ' + SCREEN_LINK_COLUMNS + ' FROM screen_links WHERE id = ?', [id]);
+  return row ? toScreenLink(row) : null;
+}
+
+// The link a key belongs to, whether or not it is revoked, or null when no link has that key.
+async function findScreenLink(keyHash) {
+  const [[row]] = await pool.query('SELECT ' + SCREEN_LINK_COLUMNS + ' FROM screen_links WHERE token_hash = ?', [keyHash]);
+  return row ? toScreenLink(row) : null;
+}
+
+async function createScreenLink(name, scope, panel, keyHash, createdBy) {
+  const [result] = await pool.query(
+    'INSERT INTO screen_links (name, scope, panel, token_hash, created_at, created_by) VALUES (?, ?, ?, ?, NOW(), ?)',
+    [name, scope, panel, keyHash, String(createdBy || 'System').slice(0, 100)]
+  );
+  return result.insertId;
+}
+
+async function touchScreenLink(id) {
+  await pool.query('UPDATE screen_links SET last_used_at = NOW() WHERE id = ?', [id]);
+}
+
+async function revokeScreenLink(id) {
+  if (!(await getScreenLink(id))) return false;
+  await pool.query('UPDATE screen_links SET revoked_at = COALESCE(revoked_at, NOW()) WHERE id = ?', [id]);
+  return true;
+}
+
+// A new key for the same screen. The old key stops working, and a link that had been revoked is switched back on.
+async function replaceScreenLinkKey(id, keyHash) {
+  if (!(await getScreenLink(id))) return false;
+  await pool.query('UPDATE screen_links SET token_hash = ?, revoked_at = NULL, last_used_at = NULL WHERE id = ?', [keyHash, id]);
+  return true;
+}
+
+async function deleteScreenLink(id) {
+  const [result] = await pool.query('DELETE FROM screen_links WHERE id = ?', [id]);
+  return result.affectedRows > 0;
+}
+
 module.exports = {
+  listScreenLinks, getScreenLink, findScreenLink, createScreenLink, touchScreenLink, revokeScreenLink, replaceScreenLinkKey, deleteScreenLink,
   init, listServices, createTicket, queueSnapshot, callNext, updateTicket, transferTicket, completedToday, ticketsForRange,
   countActiveAdmins, findUserByUsername, getUser, listUsers, createUser, updateUser, deleteUser, touchLastLogin,
   getServiceAvailability, listSchedules, createSchedule, updateSchedule, deleteSchedule, setManualOverride, listServicesAdmin,
-  findActiveSchedule, isDefaultServiceStatement,
+  findActiveSchedule, isDefaultServiceStatement, isCreateStatement,
   listCatalogServices, createService, updateService, deleteService, setLayout,
   listGroups, createGroup, updateGroup, deleteGroup,
   listLanguages, createLanguage, updateLanguage, deleteLanguage,

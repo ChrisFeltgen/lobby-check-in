@@ -41,7 +41,7 @@ Work through the steps in order. Each step ends with a **Check** so you know it 
 3. Create a folder for the app: `C:\apps\virtual-queue`.
 4. Copy the project files into it. **Leave out** `node_modules`, `.env` (if present) and `.claude`.
 
-**Check:** `C:\apps\virtual-queue` contains `server.js`, `package.json`, `db.js`, `auth.js`, `availability.js`, the `db` folder and the `public` folder.
+**Check:** `C:\apps\virtual-queue` contains `server.js`, `package.json`, `db.js`, the `db` folder, the `lib` folder and the `public` folder.
 
 ---
 
@@ -243,13 +243,13 @@ Test every screen under that path. The own-address setup is simpler and less lik
 |---|---|---|
 | Kiosk | `https://queue.example.gov/kiosk.html` | Ticket prints or confirms |
 | Queue portal | `https://queue.example.gov/queue.html` | Staff can sign in and call a customer |
-| Management | `https://queue.example.gov/manage.html` | Open & close, Staff, Reports, Settings and Health & audit tabs load |
-| Health & audit (admin) | `https://queue.example.gov/manage.html?tab=health` | **Run health check** and **Check database** both report healthy |
+| Management | `https://queue.example.gov/manage.html` | Operations, Staff, Reports, Service Configuration, Settings, Security and Health and Audit tabs load |
+| Health and Audit (admin) | `https://queue.example.gov/manage.html?tab=health` | **Run health check** and **Check database** both report healthy |
 | Monitor | `https://queue.example.gov/monitor.html?panel=left` | Updates within seconds of a change in the queue portal |
 
 The monitor should update as soon as a customer is called. If it takes up to 30 seconds, WebSockets aren't reaching the app (see troubleshooting).
 
-**Settings → Old records:** decide the retention policy with the owner before go-live. Keep everything (0 days), or blank out names or delete finished tickets after a set number of days. The cleanup runs at startup and then daily. Audit log entries are kept.
+**Settings → Old record retention:** decide the retention policy with the owner before go-live. Keep everything (0 days), or blank out names or delete finished tickets after a set number of days. The cleanup runs at startup and then daily. Audit log entries are kept.
 
 ---
 
@@ -321,7 +321,7 @@ Confirm they have done these:
 
 - [ ] Changed the first admin password and removed the `ADMIN_*` settings
 - [ ] Agreed the old-records policy in Settings, and recorded it (keep everything, blank out names, or delete after N days)
-- [ ] Ran the health check and database check in Health & audit and saw no problems
+- [ ] Ran the health check and database check in Health and Audit and saw no problems
 - [ ] Set up the nightly backup, and tested a restore on another machine
 - [ ] Opened only ports 80 and 443 to the public
 - [ ] Recorded where the secrets are stored, and who can read them

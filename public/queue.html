@@ -118,6 +118,16 @@
     .qcall:hover { filter: brightness(0.9); }
     .qwatch { flex: none; min-height: 22px; min-width: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: transparent; color: var(--muted); border: 0; font-size: 12px; line-height: 1; opacity: 0.55; }
     .qwatch:hover, .qwatch:focus-visible { opacity: 1; color: var(--danger); }
+    /* Shown across the top of the page while the list may be out of date. */
+    .conn-banner { position: sticky; top: 0; z-index: 80; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 10px 20px; background: color-mix(in srgb, var(--danger) 16%, var(--card)); border-bottom: 2px solid var(--danger); color: var(--fg); font-size: 15px; line-height: 1.4; }
+    .conn-banner strong { color: var(--danger); }
+    .conn-banner.back { background: color-mix(in srgb, #2e9e5b 16%, var(--card)); border-bottom-color: #2e9e5b; }
+    .conn-banner.back strong { color: #2e9e5b; }
+    .conn-banner button { margin-left: auto; min-height: 32px; padding: 4px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); font-weight: 600; }
+    #updated.stale { color: var(--danger); font-weight: 600; }
+    /* While the list may be out of date its buttons look off, and pressing one says why nothing was sent. */
+    .is-offline #call-next, .is-offline #add-customer, .is-offline #lobby-body button, .is-offline #serving-grid button, .is-offline .qcall, .is-offline #menu button { opacity: 0.4; cursor: not-allowed; }
+    .toast { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 95; max-width: calc(100vw - 32px); padding: 10px 18px; background: var(--fg); color: var(--bg); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-size: 15px; line-height: 1.4; }
     .undo-bar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 18px; max-width: calc(100vw - 32px); background: var(--fg); color: var(--bg); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-size: 15px; }
     .undo-bar button { min-height: 32px; padding: 4px 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); font-weight: 700; }
     .qmenu-btn { min-height: 24px; width: 26px; padding: 0; font-size: 14px; border-radius: 6px; }
@@ -156,7 +166,13 @@
     .serving-grid .empty { flex: 1 0 100%; }
     /* The left accent already sets this card apart, so the outer border is faint — just enough
        to frame the card without competing with the guest's name. */
-    .acard { border: 1px solid color-mix(in srgb, var(--border) 35%, transparent); border-left: 4px solid #1f6feb; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .acard { border: 1px solid color-mix(in srgb, var(--border) 35%, transparent); border-left: 4px solid color-mix(in srgb, var(--muted) 45%, transparent); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    /* Someone I am helping: the blue edge, a faint blue wash and my name in blue. A customer another person is helping keeps
+       the plain grey card, with that person's name, so the two cannot be mistaken for each other. */
+    .acard.mine { border-left-color: #1f6feb; border-color: color-mix(in srgb, #1f6feb 40%, transparent); background: color-mix(in srgb, #1f6feb 7%, var(--card)); }
+    .acard.mine .acard-who { color: #1f6feb; font-weight: 700; }
+    .aname-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .serving-summary { font-weight: 500; color: var(--muted); font-size: 13px; margin-left: 8px; }
     /* Name leads, top-left; elapsed time sits in a quiet pill opposite it. */
     .acard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
     .aname { font-size: 18px; line-height: 1.25; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -180,6 +196,8 @@
     /* Neutral — undoes the call rather than destroying anything, so it stays muted. */
     .icon-btn.requeue svg { color: var(--muted); }
     .icon-btn.remove svg { color: var(--danger); }
+    .icon-btn:disabled, td.actions button.call:disabled { opacity: 0.4; cursor: not-allowed; }
+    .icon-btn:disabled:hover { background: var(--card); }
     .empty { font-size: 14px; color: var(--muted); padding: 6px 0; }
 
     /* Lobby */
@@ -246,7 +264,7 @@
 <body>
   <header class="top">
     <div class="brand">
-      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.style.display='none'"></span>
       <div>
         <p class="org-label" data-org-name hidden></p>
         <h1>Lobby Check-In</h1>
@@ -266,6 +284,11 @@
       <button id="theme-toggle" class="ghost" type="button"><span class="theme-icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span><span class="theme-icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/><circle cx="12" cy="12" r="5"/></svg></span></button>
     </div>
   </header>
+
+  <div id="conn-banner" class="conn-banner hidden">
+    <span><strong id="conn-title" role="alert"></strong><span id="conn-detail"></span></span>
+    <button id="conn-retry" type="button">Retry now</button>
+  </div>
 
   <main id="dashboard" class="hidden">
     <div class="layout">
@@ -298,7 +321,7 @@
       <div class="main-col">
         <section class="panel">
           <div class="panel-head">
-            <h2>Currently Being Helped</h2>
+            <h2>Currently Being Helped<span class="serving-summary" id="serving-summary"></span></h2>
             <span class="muted" style="font-size:13px" id="updated"></span>
           </div>
           <div class="serving-grid" id="serving-grid"></div>
@@ -355,7 +378,7 @@
   <script>
     (function () {
       var BASE = location.pathname.replace(/[^/]*$/, '');
-      // A service marked "pinned" in Services & languages (Appointment Check-In, by default) always has someone
+      // A service marked "pinned" in Service Configuration (Appointment Check-In, by default) always has someone
       // due any minute, so it stays in Your Watched Queues and can't be unwatched.
       function isPinned(code) {
         var svc = state.queue.find(function (s) { return s.code === code; });
@@ -388,19 +411,118 @@
       }
 
       // The session lives in an HttpOnly cookie, sent automatically with same-origin requests.
+      // ---- Connection to the server ----
+      // The portal keeps a list on screen that goes stale if the server cannot be reached. It says so across the
+      // top of the page, pauses the buttons that change things, and carries on by itself once the server answers.
+      var REQUEST_MS = 10000;   // a request that has not been answered by now has failed
+      var STALE_MS = 25000;     // no good update for this long and the list is called out of date
+      var conn = { lastOk: Date.now(), failures: 0, stale: false, suspendUntil: 0, backTimer: null, waiting: false };
+
+      function networkError(message) {
+        var e = new Error(message);
+        e.network = true;
+        return e;
+      }
+
       async function api(path, opts) {
         opts = opts || {};
-        var headers = { 'Content-Type': 'application/json' };
-        var res = await fetch(BASE + path.replace(/^\//, ''), { method: opts.method || 'GET', headers: headers, body: opts.body, credentials: 'same-origin' });
+        var method = opts.method || 'GET';
+        // While the list is out of date, nothing that changes the queue is sent: it could land on a customer who has moved on.
+        if (method !== 'GET' && conn.stale && path.indexOf('/api/auth/logout') < 0) {
+          throw networkError('Not sent: the connection to the server is down. Try again when it is back.');
+        }
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = controller ? setTimeout(function () { controller.abort(); }, REQUEST_MS) : null;
+        var res;
+        var data;
+        var parsed = true;
+        try {
+          res = await fetch(BASE + path.replace(/^\//, ''), {
+            method: method, headers: { 'Content-Type': 'application/json' }, body: opts.body, credentials: 'same-origin',
+            signal: controller ? controller.signal : undefined
+          });
+          data = await res.json().catch(function () { parsed = false; return {}; });
+          if (controller && controller.signal.aborted) throw new Error('timed out');
+        } catch (err) {
+          throw networkError(method === 'GET' ? 'Could not reach the server.' : 'Could not reach the server. Check the queue to see whether that went through.');
+        } finally {
+          clearTimeout(timer);
+        }
+        // The web server answering instead of the app (its own 404 or error page, which is not JSON) means the app is not running.
+        if (!parsed && (res.status === 404 || res.status >= 500)) throw networkError('The server is not responding.');
         if (res.status === 401 && state.user) { state.user = null; showLogin(); }
-        var data = await res.json().catch(function () { return {}; });
         // A forced password change stops every action until it's done.
         if (data.code === 'PASSWORD_CHANGE_REQUIRED') { window.location.href = BASE + 'account.html'; throw new Error(data.error); }
-        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        if (res.status === 502 || res.status === 503 || res.status === 504) throw networkError('The server is not responding.');
+        if (!res.ok) {
+          var failure = new Error(res.status >= 500 ? 'The server had a problem. Try again in a moment.' : (data.error || 'Request failed (' + res.status + ')'));
+          failure.auth = res.status === 401;
+          throw failure;
+        }
         return data;
       }
 
-      function showMsg(text) { $('msg').textContent = text || ''; }
+      // A message for the person using the portal. It stays on the line at the foot of the page and also pops up
+      // for a few seconds, because that line is out of sight on a busy screen.
+      var toastTimer = null;
+      function showMsg(text) {
+        $('msg').textContent = text || '';
+        var old = document.getElementById('toast');
+        if (old) old.remove();
+        clearTimeout(toastTimer);
+        if (!text) return;
+        var box = el('div', 'toast', text);
+        box.id = 'toast';
+        box.setAttribute('role', 'status');
+        document.body.appendChild(box);
+        toastTimer = setTimeout(function () { box.remove(); }, 6000);
+      }
+
+      function connClock(ms) {
+        return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      }
+
+      // The list is out of date when two checks in a row fail, when the browser says there is no network, or when
+      // it has been too long since the last good one (a connection that hangs fails no check at all).
+      function connIsStale() {
+        if (conn.failures >= 2 || navigator.onLine === false) return true;
+        return Date.now() > conn.suspendUntil && Date.now() - conn.lastOk > STALE_MS;
+      }
+
+      // Draws the warning across the top, or the short "back online" note when the list catches up. Runs every second.
+      function renderConnection() {
+        var stale = !!state.user && connIsStale();
+        var was = conn.stale;
+        conn.stale = stale;
+        var banner = $('conn-banner');
+        document.body.classList.toggle('is-offline', stale);
+        $('updated').classList.toggle('stale', stale);
+        if (stale) {
+          clearTimeout(conn.backTimer);
+          if (banner.className !== 'conn-banner') banner.className = 'conn-banner';
+          // Only touched when it changes: the heading is an alert, and rewriting it every second could be read out again.
+          var title = navigator.onLine === false ? 'This computer is offline.' : 'Connection lost.';
+          if ($('conn-title').textContent !== title) $('conn-title').textContent = title;
+          $('conn-detail').textContent = ' Last updated ' + connClock(conn.lastOk) + '. Actions are paused.';
+        } else if (was) {
+          banner.className = 'conn-banner back';
+          $('conn-title').textContent = 'Back online.';
+          $('conn-detail').textContent = '';
+          clearTimeout(conn.backTimer);
+          conn.backTimer = setTimeout(function () { if (!conn.stale) banner.className = 'conn-banner hidden'; }, 4000);
+        }
+      }
+
+      function noteRefresh(ok) {
+        if (ok) {
+          conn.lastOk = Date.now();
+          conn.failures = 0;
+        } else {
+          conn.failures += 1;
+          pollSoon();
+        }
+        renderConnection();
+      }
 
       function nameOf(code) {
         var s = state.queue.find(function (q) { return q.code === code; });
@@ -572,7 +694,16 @@
       });
 
       // ---- Actions ----
+      // A customer another person is helping is theirs to complete, reassign, return or remove. Doing it anyway is
+      // allowed, but asked about first. A customer still waiting belongs to no one.
+      function confirmOthersTicket(t) {
+        if (t.status === 'waiting' || !t.calledBy || isMine(t)) return true;
+        return confirm("You are about to change someone else's ticket. Proceed?");
+      }
+
       function ticketAction(t, action) {
+        if (action === 'complete' && !isWatched(t.serviceCode)) { showMsg(watchFirst(t.serviceCode, 'complete')); return; }
+        if (!confirmOthersTicket(t)) return;
         if (action === 'remove' && !confirm('Remove ' + t.customerName + ' from the queue?')) return;
         showMsg('');
         api('/api/staff/tickets/' + t.id + '/' + action, { method: 'POST' })
@@ -581,6 +712,7 @@
       }
 
       function callTicket(t) {
+        if (!isWatched(t.serviceCode)) { showMsg(watchFirst(t.serviceCode, 'call')); return; }
         showMsg('');
         api('/api/staff/tickets/' + t.id + '/call', { method: 'POST', body: JSON.stringify({ counter: state.counter }) })
           .then(refresh)
@@ -728,7 +860,7 @@
       }
 
       // Adds a customer from this station. Uses the same check-in as the kiosk.
-      // Whether a service asks who the customer is seeing and the appointment time (set in Services & languages).
+      // Whether a service asks who the customer is seeing and the appointment time (set in Service Configuration).
       function asksAppointment(code) {
         var svc = state.queue.find(function (s) { return s.code === code; });
         return !!(svc && svc.asksAppointment);
@@ -832,6 +964,7 @@
       // Picks another queue for the customer. The list leaves out the queue they are already in.
       function openTransfer(t) {
         closeMenu();
+        if (!confirmOthersTicket(t)) return;
         var overlay = el('div', 'overlay');
         var dialog = el('div', 'dialog card');
         dialog.appendChild(el('h3', null, 'Transfer ' + t.customerName + ' to:'));
@@ -920,7 +1053,7 @@
         row.appendChild(body);
 
         var actions = el('div', 'qrow-actions');
-        var callable = hasWaiting && svc.available;
+        var callable = hasWaiting && svc.available && opts.watched;
         if (callable) {
           var mini = el('button', 'qcall', '▶');
           mini.type = 'button';
@@ -999,12 +1132,29 @@
         renderRestoreButton();
       }
 
+      // A customer is mine when I am the one who called them. Tickets keep the name of the person who called them.
+      function isMine(t) {
+        return !!(state.user && t.calledBy && t.calledBy === state.user.displayName);
+      }
+
+      // Call and Complete are only for queues being watched. Watching one is a click on its row in the list on the left.
+      function isWatched(code) {
+        return watchedCodes().indexOf(code) >= 0;
+      }
+
+      function watchFirst(code, what) {
+        return 'Watch ' + nameOf(code) + ' to ' + what + ' its customers. Click it under queues not being watched.';
+      }
+
       function renderServing() {
         var rows = [];
         state.queue.forEach(function (svc) {
           svc.serving.forEach(function (t) { rows.push(t); });
         });
-        rows.sort(function (a, b) { return new Date(a.calledAt) - new Date(b.calledAt); });
+        // Mine first, then the others, each in the order they were called.
+        rows.sort(function (a, b) { return (isMine(b) ? 1 : 0) - (isMine(a) ? 1 : 0) || new Date(a.calledAt) - new Date(b.calledAt); });
+        var mineCount = rows.filter(isMine).length;
+        $('serving-summary').textContent = rows.length ? mineCount + ' with you · ' + (rows.length - mineCount) + ' with others' : '';
 
         var grid = $('serving-grid');
         grid.textContent = '';
@@ -1013,12 +1163,15 @@
           return;
         }
         rows.forEach(function (t) {
-          var card = el('div', 'acard');
+          var mine = isMine(t);
+          var card = el('div', 'acard ' + (mine ? 'mine' : 'theirs'));
 
           // Name leads, top-left, sized down a touch to make room; elapsed time moves into a
           // quiet pill opposite it instead of plain text competing on the same line.
           var head = el('div', 'acard-head');
-          head.appendChild(el('span', 'aname', t.customerName));
+          var nameWrap = el('span', 'aname-wrap');
+          nameWrap.appendChild(el('span', 'aname', t.customerName));
+          head.appendChild(nameWrap);
           var elapsed = el('span', 'elapsed');
           elapsed.innerHTML = ICON_CLOCK;
           elapsed.appendChild(document.createTextNode(waitText(minutesSince(t.calledAt))));
@@ -1032,10 +1185,10 @@
           if (t.appointmentWith) card.appendChild(el('div', 'acard-line', 'Appointment with ' + t.appointmentWith + ' at ' + t.appointmentTime));
           // Who is helping them, and where — "Jane Doe · Window 1". Falls back gracefully for
           // any ticket called before staff accounts tracked this.
-          var who = [t.calledBy, t.counter].filter(Boolean).join(' · ') || '—';
+          var who = mine ? [t.calledBy, t.counter].filter(Boolean).join(' · ') : (t.calledBy ? 'Helped by ' + [t.calledBy, t.counter].filter(Boolean).join(' · ') : '—');
           var staffLine = el('div', 'acard-line');
           staffLine.innerHTML = ICON_PERSON;
-          staffLine.appendChild(el('span', null, who));
+          staffLine.appendChild(el('span', 'acard-who', who));
           card.appendChild(staffLine);
 
           var actions = el('div', 'acard-actions-row');
@@ -1044,6 +1197,7 @@
           complete.title = 'Complete';
           complete.innerHTML = ICON_CHECK + '<span>Complete</span>';
           complete.addEventListener('click', function (e) { e.stopPropagation(); ticketAction(t, 'complete'); });
+          if (!isWatched(t.serviceCode)) { complete.disabled = true; complete.title = watchFirst(t.serviceCode, 'complete'); }
           var transfer = el('button', 'icon-btn transfer', '');
           transfer.type = 'button';
           transfer.title = 'Reassign';
@@ -1103,6 +1257,7 @@
           var call = el('button', 'call', 'Call');
           call.type = 'button';
           call.addEventListener('click', function () { callTicket(t); });
+          if (!isWatched(t.serviceCode)) { call.disabled = true; call.title = watchFirst(t.serviceCode, 'call'); }
           var more = el('button', 'menu-btn', '⋯');
           more.type = 'button';
           more.title = 'More actions';
@@ -1174,17 +1329,37 @@
         this.textContent = historyOpen ? 'Hide' : 'Show';
       });
 
+      // One refresh at a time. A live update that arrives while one is under way asks for another straight after,
+      // so a change is never missed.
+      var refreshing = false;
+      var refreshAgain = false;
       async function refresh() {
         if (!state.user) return;
+        if (refreshing) { refreshAgain = true; return; }
+        refreshing = true;
         try {
-          state.queue = await api('/api/staff/queue');
-          checkNewArrivals(state.queue);
-          render();
-          loadHistory();
-          $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-          showMsg('');
-        } catch (err) {
-          showMsg('Connection lost. Retrying…');
+          var data;
+          try {
+            data = await api('/api/staff/queue');
+          } catch (err) {
+            // Being signed out is not a lost connection; api() has already sent the person to sign in.
+            if (!err.auth) noteRefresh(false);
+            return;
+          }
+          noteRefresh(true);
+          state.queue = data;
+          try {
+            checkNewArrivals(state.queue);
+            render();
+            loadHistory();
+            $('updated').textContent = 'Updated ' + connClock(conn.lastOk);
+            showMsg('');
+          } catch (err) {
+            console.error(err);
+          }
+        } finally {
+          refreshing = false;
+          if (refreshAgain) { refreshAgain = false; refresh(); }
         }
       }
 
@@ -1239,6 +1414,8 @@
         if (e.key === 'Enter') { e.preventDefault(); commitCounterEdit(); }
         else if (e.key === 'Escape') {
           e.preventDefault();
+          // Hiding the box makes it lose focus, and losing focus saves what is in it, so put the current name back first.
+          $('counter-edit').value = state.counter;
           $('counter-edit').classList.add('hidden');
           $('counter-display').classList.remove('hidden');
         }
@@ -1268,8 +1445,8 @@
       $('add-customer').addEventListener('click', openAddCustomer);
 
       $('call-next').addEventListener('click', function () {
-        var first = lobbyList()[0];
-        if (!first) { showMsg('No one is waiting.'); return; }
+        var first = lobbyList().filter(function (t) { return isWatched(t.serviceCode); })[0];
+        if (!first) { showMsg('No one is waiting in your watched queues.'); return; }
         callTicket(first);
       });
 
@@ -1282,27 +1459,74 @@
       loadNotifyPref();
       renderNotifyToggle();
       if (window.io) {
-        io({ path: BASE + 'socket.io' }).on('queue:changed', refresh);
+        var socket = io({ path: BASE + 'socket.io' });
+        socket.on('queue:changed', refresh);
+        // On the first connection and every reconnection: catch up on anything missed while it was down.
+        socket.on('connect', refresh);
+        // A dropped live connection is a reason to check the server now rather than at the next regular check.
+        socket.on('disconnect', function () { pollSoon(); });
       }
-      // Socket.IO delivers updates instantly in the normal case; this poll is just the fallback
-      // for a dropped/unsupported socket connection — and now also how quickly a desktop
-      // notification can arrive for a watched queue, so a shorter interval is worth the (small,
-      // one-GET-per-tick) extra load.
-      setInterval(refresh, 10000);
+      // Socket.IO delivers updates instantly in the normal case; this check is the fallback for a dropped or
+      // unsupported socket connection, and how quickly a desktop notification can arrive for a watched queue.
+      // It runs every 10 seconds, and every 3 while the last check failed so the page recovers quickly.
+      var pollTimer = null;
+      function pollQueue() {
+        refresh().catch(function () {}).then(function () {
+          clearTimeout(pollTimer);
+          pollTimer = setTimeout(pollQueue, conn.failures ? 3000 : 10000);
+        });
+      }
+      function pollSoon() {
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(pollQueue, 3000);
+      }
+      pollTimer = setTimeout(pollQueue, 10000);
 
-      // A session cookie may already be valid from an earlier visit; check before showing the login form.
-      (async function start() {
+      // The browser noticing the network come or go, and the tab coming back into view, are quicker signals than the
+      // next check. A tab left in the background can have its timers slowed right down, so on return the list
+      // is refreshed and the "out of date" warning waits a few seconds for that to finish.
+      window.addEventListener('online', function () { refresh(); renderConnection(); });
+      window.addEventListener('offline', renderConnection);
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) return;
+        conn.suspendUntil = Date.now() + 4000;
+        refresh();
+      });
+      setInterval(renderConnection, 1000);
+      $('conn-retry').addEventListener('click', function () { if (conn.waiting) start(); else refresh(); });
+
+      // A session cookie may already be valid from an earlier visit; check before showing the login form. If the
+      // server cannot be reached the person is not sent to sign in, since they may well be signed in: the page says it
+      // cannot reach the server and tries again every few seconds until it can.
+      var startTimer = null;
+      function setWaiting(on) {
+        var banner = $('conn-banner');
+        if (on) {
+          conn.waiting = true;
+          banner.className = 'conn-banner';
+          $('conn-title').textContent = 'Can\'t reach the server.';
+          $('conn-detail').textContent = ' Trying again…';
+        } else if (conn.waiting) {
+          conn.waiting = false;
+          banner.className = 'conn-banner hidden';
+        }
+      }
+      async function start() {
+        clearTimeout(startTimer);
         if (!state.counter) { showLogin(); return; }
         try {
           state.user = await api('/api/auth/me');
+          setWaiting(false);
           if (state.user.mustChangePassword) { window.location.href = BASE + 'account.html'; return; }
           applyDefaultQueues();
           showDashboard();
           refresh();
         } catch (err) {
+          if (err.network) { setWaiting(true); startTimer = setTimeout(start, 3000); return; }
           showLogin();
         }
-      })();
+      }
+      start();
     })();
   </script>
   <script src="app-settings.js"></script>

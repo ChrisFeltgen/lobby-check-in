@@ -5,13 +5,16 @@
   var BASE = location.pathname.replace(/[^/]*$/, '');
 
   function apply(s) {
-    // The uploaded logo when one is set. With no logo set, the header shows none.
+    // The uploaded logo when one is set. With no logo set, the header shows none. The logo's frame is hidden rather
+    // than taken out of the page, so a logo uploaded later shows on a screen that is already open.
     document.querySelectorAll('img.logo').forEach(function (img) {
+      var frame = img.parentNode;
       if (s.logoUrl) {
         img.src = BASE + s.logoUrl;
         img.style.visibility = '';
+        frame.style.display = '';
       } else {
-        img.parentNode.remove();
+        frame.style.display = 'none';
       }
     });
     var org = (s.org_name || '').trim();
@@ -29,6 +32,13 @@
       .catch(function () {
         return new Promise(function (done) { setTimeout(done, 5000); }).then(load);
       });
+  }
+
+  // Keeps the pages openable when the server cannot be reached (see sw.js). The pages work without it.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register(BASE + 'sw.js').catch(function () { /* no service worker: nothing is lost */ });
+    });
   }
 
   window.appSettingsReady = load().then(function (s) {

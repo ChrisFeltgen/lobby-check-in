@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const c = require('../catalog');
-const { UI_STRINGS } = require('../ui-strings');
-const seed = require('../catalog-seed');
-const settings = require('../settings');
+const c = require('../lib/catalog');
+const { UI_STRINGS } = require('../lib/ui-strings');
+const seed = require('../lib/catalog-seed');
+const settings = require('../lib/settings');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -170,4 +170,119 @@ test('the default appointment service asks the questions and is pinned, and noth
   for (const [code, s] of Object.entries(seed.SERVICES)) {
     if (code !== 'AC') assert.ok(!s.appointment && !s.pinned, code);
   }
+});
+
+// ---- Translations: nothing the kiosk shows is left out, and what is added later is picked up ----
+
+// The kiosk page asks for its wording by key (data-i18n="...", t('...'), tOr('...'), the progress step names, and a few
+// read straight from the strings, such as strings.offline_title). Every key it asks for has to be in the list, and every
+// message in the list has to be used, or a translator is asked to translate text that nobody sees.
+test('the kiosk page uses exactly the wording in the translation list', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'public', 'kiosk.html'), 'utf8');
+  const asked = new Set();
+  for (const m of html.matchAll(/data-i18n="([a-z_]+)"/g)) asked.add(m[1]);
+  for (const m of html.matchAll(/\bt(?:Or)?\('([a-z_]+)'/g)) asked.add(m[1]);
+  const steps = /var STEP_KEYS = \[([^\]]*)\]/.exec(html);
+  assert.ok(steps, 'the progress step names are found');
+  for (const m of steps[1].matchAll(/'([a-z_]+)'/g)) asked.add(m[1]);
+  for (const key of asked) assert.ok(key in UI_STRINGS.en, 'the kiosk asks for "' + key + '", which is not in the wording list');
+  for (const key of Object.keys(UI_STRINGS.en)) {
+    const quoted = new RegExp('[\'"]' + key + '[\'"]').test(html);
+    const read = new RegExp('[\\w)\\]]\\.' + key + '\\b').test(html);
+    assert.ok(quoted || read, '"' + key + '" is in the wording list but the kiosk never shows it');
+  }
+});
+
+// A new install gets all the Spanish text at once. An install set up earlier is given what was added since by the
+// batches in ADDED_WORDING, each once. So every message that was not part of the first setup must be in a batch, or an
+// install that already exists would show it in English in every other language.
+const FIRST_SETUP_WORDING = [
+  'brand', 'hero_title', 'hero_sub', 'step_name', 'step_appt', 'step_time', 'title_name', 'sub_name', 'title_host', 'sub_host',
+  'ph_name', 'ph_host', 'checking_in', 'btn_back', 'btn_join', 'btn_next', 'btn_continue', 'btn_done', 'appt_with', 'time_title',
+  'time_sub', 'morning', 'afternoon', 'space', 'err_name', 'err_host', 'err_time', 'err_generic', 'err_services', 'unavailable_sub',
+  'done_checked', 'done_next', 'done_one', 'done_many', 'done_watch',
+];
+
+test('every message added after the first setup is in a batch that gives existing installs its Spanish text', () => {
+  const added = Object.keys(UI_STRINGS.en).filter((key) => !FIRST_SETUP_WORDING.includes(key)).sort();
+  const batched = [].concat(...seed.ADDED_WORDING.map((batch) => batch.keys)).sort();
+  assert.deepEqual(batched, added, 'add the key of a new message to a NEW batch in catalog-seed.js (with the next wording_added_N flag)');
+  assert.equal(new Set(seed.ADDED_WORDING.map((batch) => batch.flag)).size, seed.ADDED_WORDING.length, 'each batch has its own flag');
+  for (const key of batched) assert.ok(UI_STRINGS.es[key], 'Spanish text for ' + key);
+});
+
+// A stand-in for the one database connection the seeding uses: it remembers which batches are done and what was put in.
+function seedConnection(options) {
+  const state = { flags: new Set(options.flags || []), spanish: options.spanish !== false, inserted: [] };
+  return {
+    state,
+    async query(sql, params) {
+      if (/FROM app_settings WHERE setting_key = \?/.test(sql)) return [state.flags.has(params[0]) ? [{ v: '1' }] : []];
+      if (/FROM languages/.test(sql)) return [[{ n: state.spanish ? 1 : 0 }]];
+      if (/INSERT IGNORE INTO translations/.test(sql)) { state.inserted.push(params[1]); return [{}]; }
+      if (/INSERT INTO app_settings/.test(sql)) { state.flags.add(params[0]); return [{}]; }
+      throw new Error('unexpected query: ' + sql);
+    },
+  };
+}
+
+test('an install set up before a batch of wording gets that batch once, and nothing it already had is touched', async () => {
+  const all = seed.ADDED_WORDING.map((b) => b.keys.map((k) => c.keys.ui(k)));
+  // Never seeded: every batch goes in, and each is marked done.
+  let conn = seedConnection({});
+  await seed.seedAddedWording(conn);
+  assert.deepEqual(conn.state.inserted.sort(), [].concat(...all).sort());
+  assert.equal(conn.state.flags.size, seed.ADDED_WORDING.length);
+  // Run again: nothing more is put in.
+  conn.state.inserted.length = 0;
+  await seed.seedAddedWording(conn);
+  assert.deepEqual(conn.state.inserted, []);
+  // Set up when only the first batch existed (your live system): only the later batches go in.
+  conn = seedConnection({ flags: [seed.ADDED_WORDING[0].flag] });
+  await seed.seedAddedWording(conn);
+  assert.deepEqual(conn.state.inserted.sort(), [].concat(...all.slice(1)).sort());
+  assert.ok(!conn.state.inserted.includes(c.keys.ui('welcome_title')), 'text from a batch that is done is not put back');
+});
+
+test('wording is not added for a language that has been deleted, but the batches are still marked done', async () => {
+  const conn = seedConnection({ spanish: false });
+  await seed.seedAddedWording(conn);
+  assert.deepEqual(conn.state.inserted, []);
+  assert.equal(conn.state.flags.size, seed.ADDED_WORDING.length);
+});
+
+test('the translation list is built from the services as they are now, so a new service is in it at once, untranslated', () => {
+  const groups = [{ id: 'building', englishLabel: 'Building Dept.' }];
+  const ui = { btn_join: 'Join Queue' };
+  const before = [{ code: 'BPI', name: 'Permits', description: 'Permits and inspections' }];
+  const saved = { 'service.BPI.name': 'Permisos', 'service.BPI.description': 'Permisos e inspecciones', 'group.building.label': 'Edificios', 'ui.btn_join': 'Registrarse' };
+  assert.equal(c.untranslatedCount(c.translationItems(before, groups, ui, saved)), 0);
+  // The same list with a service added, and nothing translated for it.
+  const after = before.concat([{ code: 'TAX', name: 'Tax Help', description: 'Questions about tax receipts' }]);
+  const items = c.translationItems(after, groups, ui, saved);
+  assert.deepEqual(items.filter((i) => !i.value).map((i) => i.key), ['service.TAX.name', 'service.TAX.description']);
+  assert.equal(c.untranslatedCount(items), 2);
+  assert.equal(items.find((i) => i.key === 'service.TAX.name').english, 'Tax Help');
+});
+
+test('a service with no description has no description to translate, unless one is already translated', () => {
+  const none = c.translationItems([{ code: 'TAX', name: 'Tax Help', description: '' }], [], {}, {});
+  assert.deepEqual(none.map((i) => i.key), ['service.TAX.name']);
+  const kept = c.translationItems([{ code: 'TAX', name: 'Tax Help', description: '' }], [], {}, { 'service.TAX.description': 'Texto' });
+  assert.deepEqual(kept.map((i) => i.key), ['service.TAX.name', 'service.TAX.description']);
+});
+
+test('each service lists the languages that are missing its name, or its description when it has one', () => {
+  const services = [
+    { code: 'BPI', name: 'Permits', description: 'Permits and inspections' },
+    { code: 'TAX', name: 'Tax Help', description: 'Questions about tax receipts' },
+    { code: 'ZD', name: 'Zoning', description: '' },
+  ];
+  const byLang = {
+    es: { 'service.BPI.name': 'Permisos', 'service.BPI.description': 'Permisos', 'service.ZD.name': 'Zonificación' },
+    fr: { 'service.BPI.name': 'Permis' },
+  };
+  assert.deepEqual(c.serviceTranslationGaps(services, ['es', 'fr'], byLang), { BPI: ['fr'], TAX: ['es', 'fr'], ZD: ['fr'] });
+  assert.deepEqual(c.serviceTranslationGaps(services, [], byLang), {}, 'with no other language there is nothing to translate');
+  assert.deepEqual(c.serviceTranslationGaps(services, ['es'], { es: { 'service.TAX.name': 'Ayuda' } }).TAX, ['es'], 'a name alone is not enough when there is a description');
 });

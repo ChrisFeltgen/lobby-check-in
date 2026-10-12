@@ -43,8 +43,8 @@
     /* On a narrow screen the tabs scroll sideways instead of running off the page. */
     .tabs { display: flex; gap: 6px; max-width: 1000px; margin: 12px auto 0; padding: 0 20px; box-shadow: inset 0 -1px 0 var(--border); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn, .tab-link { flex: none; white-space: nowrap; background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px 10px; min-height: 0; font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: none; transition: color 0.12s ease, border-color 0.12s ease; }
-    .tab-btn:hover, .tab-link:hover { color: var(--fg); }
+    .tab-btn { flex: none; white-space: nowrap; background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px 10px; min-height: 0; font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: none; transition: color 0.12s ease, border-color 0.12s ease; }
+    .tab-btn:hover { color: var(--fg); }
     .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
     main { max-width: 1000px; margin: 0 auto; padding: 20px; }
@@ -68,9 +68,26 @@
     .key-row > .key-field { flex: 1 1 280px; min-width: 0; }
     .key-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); min-width: 0; }
     .field-label { font-size: 14px; color: var(--muted); }
+    .logo-line { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; }
     .logo-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .logo-preview { max-height: 48px; width: auto; background: #fff; border-radius: 6px; padding: 4px 8px; }
     .logo-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    /* Access links for the kiosk and monitor, on the Security tab. */
+    /* The access links are their own block under the switch: a rule above, a heading, one line of explanation, the form,
+       then the list. Empty message and result areas take no room until they have something to say. */
+    .links-block { gap: 12px; margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .links-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--fg); }
+    .links-block > .msg:empty, .links-block > div:empty { display: none; }
+    .links-block form.inline { margin: 0; }
+    .links-block .links-table { margin: 0; }
+    .links-intro { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+    .links-table td, .links-table th { vertical-align: middle; }
+    .links-table td.when { white-space: nowrap; font-size: 13px; color: var(--muted); }
+    .link-result { border: 2px solid #2e9e5b; border-radius: 10px; padding: 12px 14px; background: color-mix(in srgb, #2e9e5b 8%, var(--card)); display: flex; flex-direction: column; gap: 8px; }
+    .link-result p { margin: 0; font-size: 14px; color: var(--fg); }
+    .link-result code { display: block; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); font-size: 13px; word-break: break-all; user-select: all; color: var(--fg); }
+    .link-result .link-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .link-result .link-actions label { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
     .audit-search { width: 100%; max-width: 360px; min-height: 38px; margin: 0 0 12px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
     form.inline input, form.inline select { min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
     /* A checkbox with its label beside it, not the full-size text-field style above. */
@@ -235,12 +252,162 @@
     .bar-fill.arrivals { background: var(--accent); }
     .bar-fill.served { background: #166a37; }
     .bar-num { min-width: 28px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* ---- Service Configuration tab (it was its own page). Every rule is scoped to the tab. ---- */
+    /* Sections inside this page: connected switcher, like the report views on Management. */
+    #panel-catalog .subtabs { display: inline-flex; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border: 1px solid var(--border); border-radius: 8px; margin: 0 0 16px; background: var(--card); }
+    #panel-catalog .subtab-btn { flex: none; background: var(--card); color: var(--fg); border: 0; border-right: 1px solid var(--border); border-radius: 0; min-height: 38px; padding: 8px 16px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+    #panel-catalog .subtab-btn:last-child { border-right: 0; }
+    #panel-catalog .subtab-btn:hover { background: var(--bg); }
+    #panel-catalog .subtab-btn.active { background: var(--accent); color: var(--accent-fg); }
+
+    #panel-catalog h2 { margin: 0 0 4px; font-size: 18px; }
+    #panel-catalog .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+    #panel-catalog .intro { margin: 0 0 14px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+    #panel-catalog .msg { min-height: 20px; margin: 0; font-size: 14px; color: var(--danger); }
+    #panel-catalog .msg.ok { color: #2e9e5b; }
+
+    #panel-catalog input, #panel-catalog select, #panel-catalog textarea, #panel-catalog button { font-family: inherit; }
+    #panel-catalog input[type="text"], #panel-catalog input[type="number"], #panel-catalog select, #panel-catalog textarea { width: 100%; min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    #panel-catalog textarea { resize: vertical; line-height: 1.35; }
+    #panel-catalog input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: none; }
+    #panel-catalog input:focus-visible, #panel-catalog select:focus-visible, #panel-catalog textarea:focus-visible, #panel-catalog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    #panel-catalog button { min-height: 38px; padding: 6px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--fg); }
+    #panel-catalog button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    #panel-catalog button.danger { background: color-mix(in srgb, var(--danger) 10%, var(--card)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--card)); }
+    #panel-catalog button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 18%, var(--card)); }
+    #panel-catalog button:disabled { opacity: 0.45; cursor: default; }
+
+    /* Labelled fields in a 12-column grid. Each field says how many columns it takes. */
+    #panel-catalog .fields { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+    #panel-catalog .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; grid-column: span 12; }
+    #panel-catalog .field .hint { font-size: 12px; font-weight: 400; }
+    @media (min-width: 720px) {
+
+      #panel-catalog .c3 { grid-column: span 3; } #panel-catalog .c2 { grid-column: span 2; } #panel-catalog .c4 { grid-column: span 4; } #panel-catalog .c5 { grid-column: span 5; } #panel-catalog .c6 { grid-column: span 6; } #panel-catalog .c7 { grid-column: span 7; }
+    }
+    @media (min-width: 480px) and (max-width: 719px) {
+ #panel-catalog .c2, #panel-catalog .c3, #panel-catalog .c4 { grid-column: span 6; } }
+
+    /* Adding: a closed section until it is needed, so the list stays in front. */
+    #panel-catalog details.add { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+    #panel-catalog details.add > summary { cursor: pointer; padding: 12px 18px; font-weight: 700; font-size: 15px; list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 10px; }
+    #panel-catalog details.add > summary::-webkit-details-marker { display: none; }
+    #panel-catalog details.add > summary::before { content: "+"; display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: var(--accent-fg); font-size: 16px; line-height: 1; }
+    #panel-catalog details.add[open] > summary::before { content: "–"; }
+    #panel-catalog details.add > summary:hover { background: var(--bg); }
+    #panel-catalog details.add .add-body { padding: 4px 18px 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+    #panel-catalog .form-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+    #panel-catalog .form-foot .msg { flex: 1; min-width: 160px; }
+
+    /* One card per service or group: its header, its fields, and its own Save. */
+    #panel-catalog .list { display: flex; flex-direction: column; gap: 12px; }
+    #panel-catalog .item-card { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+    #panel-catalog .item-card.is-off { border-left-color: var(--muted); }
+    #panel-catalog .item-card.is-off .item-code, #panel-catalog .item-card.is-off .icon-preview { opacity: 0.6; }
+    #panel-catalog .item-card.is-dirty { border-color: var(--accent); }
+    #panel-catalog .item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 30px; }
+    #panel-catalog .item-code { font-size: 16px; font-weight: 700; }
+    #panel-catalog .item-note { font-size: 13px; color: var(--muted); }
+    #panel-catalog .item-head .spacer { flex: 1; }
+    #panel-catalog .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); cursor: pointer; }
+    #panel-catalog .pill { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; padding: 3px 9px; border-radius: 999px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+    /* A service or language that still needs translating: a button, so one click goes to the items. */
+    #panel-catalog .pill.warn { background: color-mix(in srgb, #e0a100 18%, var(--card)); border-color: color-mix(in srgb, #e0a100 55%, var(--card)); color: var(--fg); }
+    #panel-catalog button.pill { min-height: 0; cursor: pointer; font-family: inherit; }
+    #panel-catalog button.pill:hover { background: color-mix(in srgb, #e0a100 30%, var(--card)); }
+    #panel-catalog .link-btn { background: none; border: 0; min-height: 0; padding: 0; color: var(--accent); text-decoration: underline; font: inherit; font-weight: 600; cursor: pointer; }
+    /* The number of items still to translate, on the Translations tab. */
+    #panel-catalog .badge { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: #e0a100; color: #1d1600; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; vertical-align: 1px; }
+    #panel-catalog .option-row { grid-column: span 12; display: flex; flex-wrap: wrap; gap: 8px 28px; padding-top: 2px; }
+    #panel-catalog .option-row .switch { align-items: flex-start; font-size: 14px; }
+    #panel-catalog .option-row .switch input { margin-top: 2px; }
+    #panel-catalog .option-row .switch small { display: block; color: var(--muted); font-size: 12px; }
+    #panel-catalog .item-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    #panel-catalog .item-foot .row-msg { flex: 1; min-width: 120px; margin: 0; font-size: 13px; color: var(--danger); }
+    #panel-catalog .item-foot .row-msg.ok { color: #2e9e5b; }
+    #panel-catalog .empty { padding: 20px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 10px; }
+
+    /* Kiosk layout: the rows as the kiosk draws them, with tiles to drag between them. */
+    #panel-catalog .board-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap; }
+    #panel-catalog .board-head > div:first-child { flex: 1 1 420px; }
+    #panel-catalog .board-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #panel-catalog .panel.is-dirty { border-color: var(--accent); }
+    #panel-catalog .board { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    #panel-catalog .board-row { display: flex; align-items: stretch; gap: 10px; }
+    #panel-catalog .board-row .row-label { flex: none; width: 58px; padding-top: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+    #panel-catalog .board-row.is-long .row-label { color: var(--danger); }
+    #panel-catalog .board-zone { flex: 1; min-width: 0; min-height: 60px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px; background: var(--bg); }
+    #panel-catalog .board-zone.is-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
+    #panel-catalog .board-zone .zone-empty { font-size: 13px; color: var(--muted); padding: 0 6px; }
+    #panel-catalog .board-tools { flex: none; display: flex; align-items: center; }
+    #panel-catalog .board-tools button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+    #panel-catalog .tile-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 250px; min-height: 0; padding: 7px 12px 7px 8px; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px; background: var(--card); color: var(--fg); font-size: 14px; font-weight: 600; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #panel-catalog .tile-chip:hover { border-color: var(--accent); }
+    #panel-catalog .tile-chip .icon-preview { width: 20px; height: 20px; }
+    #panel-catalog .tile-chip .icon-preview svg { width: 18px; height: 18px; }
+    #panel-catalog .tile-chip .nm { font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    #panel-catalog .tile-chip.is-dragging { opacity: 0.3; }
+    #panel-catalog .drag-ghost { position: fixed; z-index: 200; margin: 0; pointer-events: none; opacity: 0.95; cursor: grabbing; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); }
+    #panel-catalog .drop-marker { flex: none; width: 4px; align-self: stretch; min-height: 34px; border-radius: 2px; background: var(--accent); }
+    #panel-catalog #layout-add-row { margin-top: 10px; border-style: dashed; width: 100%; }
+    #panel-catalog #layout-add-row.is-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+    #panel-catalog .field-note { margin: 0; font-size: 13px; color: var(--muted); }
+    #panel-catalog .layout-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+    #panel-catalog .layout-note:empty { display: none; }
+    #panel-catalog .layout-note.warn { color: var(--danger); }
+
+    /* Icon picker: a button showing the chosen icon, and a grid to choose from. */
+    #panel-catalog .icon-preview { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; color: var(--accent); flex: none; }
+    #panel-catalog .icon-preview svg { width: 22px; height: 22px; }
+    #panel-catalog .picker { position: relative; }
+    #panel-catalog .picker-btn { width: 100%; justify-content: flex-start; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 15px; text-align: left; }
+    #panel-catalog .picker-btn .icon-preview { width: 22px; height: 22px; }
+    #panel-catalog .picker-btn .icon-preview svg { width: 18px; height: 18px; }
+    #panel-catalog .picker-btn .caret { margin-left: auto; opacity: 0.6; font-size: 11px; }
+    #panel-catalog .icon-pop { position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 4px; padding: 8px; display: grid; grid-template-columns: repeat(6, 40px); gap: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
+    #panel-catalog .icon-pop.align-right { left: auto; right: 0; }
+    #panel-catalog .icon-pop button { width: 40px; height: 40px; min-height: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--accent); }
+    #panel-catalog .icon-pop button.none { color: var(--muted); font-size: 12px; font-weight: 600; }
+    #panel-catalog .icon-pop button.selected { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+    #panel-catalog .icon-pop svg { width: 22px; height: 22px; }
+
+    /* Colour: a swatch to pick from, and the hex value beside it. */
+    #panel-catalog .color-field { display: flex; gap: 6px; align-items: center; }
+    #panel-catalog .color-field input[type="color"] { flex: none; width: 42px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); cursor: pointer; }
+    #panel-catalog .color-field input[type="text"] { min-width: 0; }
+    #panel-catalog .color-field.is-empty input[type="color"] { opacity: 0.35; }
+
+    /* Translations */
+    #panel-catalog .tr-bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+    #panel-catalog .tr-bar .field { grid-column: auto; min-width: 220px; }
+    #panel-catalog .tr-bar .switch { min-height: 38px; }
+    #panel-catalog .tr-progress { margin-left: auto; font-size: 14px; color: var(--muted); min-height: 38px; display: flex; align-items: center; }
+    #panel-catalog .section-title { margin: 22px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 700; }
+    #panel-catalog .translate-item { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    #panel-catalog .translate-item .t-label { font-size: 13px; font-weight: 600; padding-top: 8px; overflow-wrap: anywhere; }
+    #panel-catalog .translate-item .english { color: var(--muted); font-size: 14px; line-height: 1.35; padding-top: 8px; overflow-wrap: anywhere; }
+    #panel-catalog .translate-item .english:empty::before { content: "(empty)"; opacity: 0.6; }
+    #panel-catalog .translate-item.is-changed input, #panel-catalog .translate-item.is-changed textarea { border-color: var(--accent); }
+    #panel-catalog .only-todo .translate-item.is-done, #panel-catalog .only-todo .section-title.is-done { display: none; }
+    #panel-catalog .tr-head { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; padding: 14px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 600; }
+    @media (max-width: 719px) {
+
+      #panel-catalog .translate-item { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+      #panel-catalog .translate-item .t-label, #panel-catalog .translate-item .english { padding-top: 0; }
+      #panel-catalog .tr-head { display: none; }
+      #panel-catalog .tr-progress { margin-left: 0; }
+    }
+    #panel-catalog .save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px -18px -16px; padding: 12px 18px; background: var(--card); border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+    #panel-catalog .save-bar .msg { flex: 1; min-width: 160px; }
+
+    #panel-catalog .subtabs::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body>
   <header class="top">
     <div class="brand">
-      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.style.display='none'"></span>
       <div>
         <p class="org-label" data-org-name hidden></p>
         <h1>Management</h1>
@@ -258,23 +425,143 @@
   </header>
 
   <nav class="tabs hidden" id="tabs">
-    <button class="tab-btn" data-tab="services" type="button">Open &amp; close</button>
+    <button class="tab-btn" data-tab="services" type="button">Operations</button>
     <button class="tab-btn" data-tab="staff" type="button">Staff</button>
     <button class="tab-btn" data-tab="reports" type="button">Reports</button>
+    <button class="tab-btn" data-tab="catalog" type="button">Service Configuration</button>
     <button class="tab-btn" data-tab="settings" type="button">Settings</button>
-    <button class="tab-btn" data-tab="health" type="button">Health &amp; audit</button>
-    <a class="tab-link hidden" id="catalog-link" href="catalog.html">Services &amp; languages</a>
+    <button class="tab-btn" data-tab="security" type="button">Security</button>
+    <button class="tab-btn" data-tab="health" type="button">Health and Audit</button>
   </nav>
 
   <main id="app">
     <p class="muted" style="padding:20px">Loading…</p>
   </main>
 
+  <!-- The Service Configuration tab. catalogTab.init() draws it into #panel-catalog, for admins only. -->
+  <template id="catalog-template">
+    <p class="msg hidden" id="cfg-load-msg" role="status"></p>
+    <nav class="subtabs hidden" aria-label="Service configuration sections">
+      <button class="subtab-btn" data-tab="services" type="button">Services</button>
+      <button class="subtab-btn" data-tab="groups" type="button">Department groups</button>
+      <button class="subtab-btn" data-tab="languages" type="button">Languages</button>
+      <button class="subtab-btn" data-tab="translations" type="button">Translations<span class="badge hidden" id="tr-badge"></span></button>
+    </nav>
+
+  <div class="cfg-body hidden" id="cfg-body">
+    <!-- Services -->
+    <section id="cfg-panel-services">
+      <details class="add" id="svc-add-box">
+        <summary>Add a service</summary>
+        <div class="add-body">
+          <p class="intro">A service needs a code (2 to 10 letters or numbers) and a name. A description and an icon help customers choose. The service shows on the kiosk as soon as it is added.</p>
+          <div class="fields">
+            <label class="field c3">Code<input type="text" id="svc-new-code" maxlength="10" placeholder="e.g. TAX" autocomplete="off"></label>
+            <label class="field c5">Name<input type="text" id="svc-new-name" maxlength="100"></label>
+            <label class="field c4">Department group<select id="svc-new-group"></select></label>
+            <label class="field c12" style="grid-column: span 12">Description<input type="text" id="svc-new-description" maxlength="255" placeholder="One short line shown under the name on the kiosk"></label>
+            <div class="field c4">Icon<div id="svc-new-icon-slot"></div></div>
+            <div class="field c4">Colour on the monitor<div id="svc-new-color-slot"></div><span class="hint">Used when the service is not in a group.</span></div>
+            <div class="option-row">
+              <label class="switch"><input type="checkbox" id="svc-new-appt"><span>Asks who they are seeing and the appointment time<small>For appointment check-in. The kiosk and the walk-in form ask the two questions.</small></span></label>
+              <label class="switch"><input type="checkbox" id="svc-new-pinned"><span>Always in staff watched queues<small>Staff cannot unwatch it, and it sits first in their list.</small></span></label>
+            </div>
+            <p class="field-note" style="grid-column: span 12">A new service goes at the end of the last kiosk row, or on a new row when that one is full. Move it in the Kiosk layout above.</p>
+          </div>
+          <div class="form-foot">
+            <button class="primary" id="svc-add" type="button">Add service</button>
+            <p class="msg" id="svc-add-msg" role="status"></p>
+          </div>
+        </div>
+      </details>
+      <div class="panel" id="svc-layout-box">
+        <div class="board-head">
+          <div>
+            <h2>Kiosk layout</h2>
+            <p class="intro" style="margin:0">Drag a service to move it: along its row, to another row, or onto <strong>Add a row</strong> to start a new one. With a service selected, the arrow keys move it too. Nothing changes on the kiosk until you press <strong>Save layout</strong>.</p>
+          </div>
+          <div class="board-actions">
+            <button type="button" id="layout-discard" disabled>Discard changes</button>
+            <button type="button" class="primary" id="layout-save" disabled>Save layout</button>
+          </div>
+        </div>
+        <div class="board" id="svc-layout" aria-label="Kiosk rows"></div>
+        <button type="button" id="layout-add-row">+ Add a row</button>
+        <p class="layout-note" id="svc-layout-note"></p>
+        <p class="msg" id="layout-msg" role="status" style="margin-top:8px"></p>
+      </div>
+      <p class="intro">Change a service and press Save on its card. A service with customers on record cannot be deleted; turn it off instead, so its history stays in the reports. Services are listed in the order they appear on the kiosk.</p>
+      <div class="list" id="svc-list"></div>
+    </section>
+
+    <!-- Department groups -->
+    <section id="cfg-panel-groups" class="hidden">
+      <details class="add" id="grp-add-box">
+        <summary>Add a department group</summary>
+        <div class="add-body">
+          <p class="intro">Services in the same group share one card on the lobby monitor, for example Building Dept. A group needs a short id, such as "permits". The id cannot be changed later.</p>
+          <div class="fields">
+            <label class="field c3">Id<input type="text" id="grp-new-id" maxlength="40" placeholder="e.g. permits" autocomplete="off"></label>
+            <label class="field c5">Name<input type="text" id="grp-new-label" maxlength="100"></label>
+            <div class="field c4">Icon<div id="grp-new-icon-slot"></div></div>
+            <div class="field c4">Colour<div id="grp-new-color-slot"></div></div>
+          </div>
+          <div class="form-foot">
+            <button class="primary" id="grp-add" type="button">Add group</button>
+            <p class="msg" id="grp-add-msg" role="status"></p>
+          </div>
+        </div>
+      </details>
+      <p class="intro">A group that still has services cannot be deleted. Move those services to another group first. To show a new group on a monitor, choose it in Settings, under Monitor configuration.</p>
+      <div class="list" id="grp-list"></div>
+    </section>
+
+    <!-- Languages -->
+    <section id="cfg-panel-languages" class="hidden">
+      <details class="add" id="lang-add-box">
+        <summary>Add a language</summary>
+        <div class="add-body">
+          <p class="intro">Add a language, then translate the services, groups and kiosk wording for it on the Translations tab. The kiosk offers a language as soon as it is on. Use the language's own name, such as Español.</p>
+          <div class="fields">
+            <label class="field c3">Code<input type="text" id="lang-new-code" maxlength="10" placeholder="e.g. pt-br" autocomplete="off"></label>
+            <label class="field c5">Name<input type="text" id="lang-new-name" maxlength="50"></label>
+          </div>
+          <div class="form-foot">
+            <button class="primary" id="lang-add" type="button">Add language</button>
+            <p class="msg" id="lang-add-msg" role="status"></p>
+          </div>
+        </div>
+      </details>
+      <p class="intro">English is always available. Turn a language off to hide it from the kiosk without losing its translations.</p>
+      <div class="list" id="lang-list"></div>
+    </section>
+
+    <!-- Translations -->
+    <section id="cfg-panel-translations" class="hidden">
+      <div class="panel">
+        <div class="tr-bar">
+          <label class="field">Language to translate<select id="tr-lang"></select></label>
+          <label class="switch"><input type="checkbox" id="tr-todo"> Show only items still to translate</label>
+          <span class="tr-progress" id="tr-count"></span>
+        </div>
+        <p class="intro" style="margin:12px 0 0">The English is shown beside each item. Leave a box empty to use the English on the kiosk.</p>
+        <div class="tr-head" id="tr-head"><span>Item</span><span>English</span><span>Translation</span></div>
+        <div id="tr-body"></div>
+        <div class="save-bar">
+          <button class="primary" id="tr-save" type="button">Save translations</button>
+          <span class="msg" id="tr-msg" role="status"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+  </template>
+
   <script src="app-settings.js"></script>
+  <script src="icons.js"></script>
   <script>
     (function () {
       var BASE = location.pathname.replace(/[^/]*$/, '');
-      var state = { user: null, services: [], users: [], editing: null, svcUi: { search: '', filter: 'all', open: {} } };
+      var state = { user: null, servicesStale: false, services: [], users: [], editing: null, svcUi: { search: '', filter: 'all', open: {} } };
       var ROLE_LABEL = { staff: 'Staff', manager: 'Manager', admin: 'Admin' };
       var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       var NTH_LABELS = { '1': '1st', '2': '2nd', '3': '3rd', '4': '4th', 'last': 'last' };
@@ -282,7 +569,7 @@
       // all (manager/admin) can see every tab today, but a tab could be narrowed to ['admin']
       // here without touching anything else — layout.(showTab) hides a tab button that the
       // signed-in role isn't in this list for.
-      var TAB_ACCESS = { services: ['manager', 'admin'], staff: ['manager', 'admin'], reports: ['manager', 'admin'], settings: ['admin'], health: ['admin'] };
+      var TAB_ACCESS = { services: ['manager', 'admin'], staff: ['manager', 'admin'], reports: ['manager', 'admin'], catalog: ['admin'], settings: ['admin'], security: ['admin'], health: ['admin'] };
 
       function $(id) { return document.getElementById(id); }
       // Whether the "require a password change" box starts ticked, as set in Settings.
@@ -382,7 +669,7 @@
         message.required = true;
         message.value = svc.manualMessage || svc.currentMessage || '';
         message.placeholder = 'e.g. Closed for a Special Magistrate Hearing';
-        form.appendChild(labelled('Reason customers will see', message));
+        form.appendChild(labelled('Reason customers will see (shown as typed, in every language)', message));
 
         var until = document.createElement('input');
         until.type = 'datetime-local';
@@ -449,7 +736,7 @@
         message.required = true;
         message.placeholder = 'e.g. Closed for a Special Magistrate Hearing';
         if (existing) message.value = existing.message;
-        form.appendChild(labelled('Reason customers will see', message));
+        form.appendChild(labelled('Reason customers will see (shown as typed, in every language)', message));
 
         var recurrence = document.createElement('select');
         ['weekly', 'monthly_nth'].forEach(function (v) {
@@ -1125,11 +1412,16 @@
         return q ? tickets.filter(function (t) { return t.customerName.toLowerCase().indexOf(q) >= 0; }) : tickets;
       }
 
+      // A range of a year can hold tens of thousands of tickets, more than a browser draws comfortably in a table. The
+      // list shows the first part and says so; Export CSV always has every ticket in the range.
+      var HISTORY_ROWS = 1500;
+
       function historyView(tickets) {
         var q = report.search.trim();
         var shown = filteredHistory(tickets);
         if (!shown.length) return el('p', 'empty', q ? 'No tickets match "' + q + '".' : 'No tickets in this range.');
-        var rows = shown.map(function (t) {
+        var limited = shown.length > HISTORY_ROWS;
+        var rows = (limited ? shown.slice(0, HISTORY_ROWS) : shown).map(function (t) {
           return [
             t.ticketNumber,
             t.customerName,
@@ -1146,7 +1438,13 @@
           { label: 'Ticket' }, { label: 'Name' }, { label: 'Service' }, { label: 'Arrived' },
           { label: 'Called' }, { label: 'Completed' }, { label: 'Staff' }, { label: 'Counter' }, { label: 'Status' }
         ];
-        return reportTable(headers, rows);
+        var table = reportTable(headers, rows);
+        if (!limited) return table;
+        var box = el('div');
+        box.appendChild(el('p', 'muted', 'Showing the first ' + HISTORY_ROWS.toLocaleString() + ' of ' + shown.length.toLocaleString() +
+          ' tickets. Choose fewer days or search by name to see the rest. Export CSV has every ticket.'));
+        box.appendChild(table);
+        return box;
       }
 
       function serviceView(tickets) {
@@ -1447,7 +1745,7 @@
           .then(function () { window.location.href = BASE + 'index.html'; });
       });
 
-      // ================= Settings tab (admins only) =================
+      // ================= Settings and Security tabs, and Health and Audit (admins only) =================
       // Plain-language names for the action codes the server writes to the audit log.
       var AUDIT_LABEL = {
         'auth.login': 'Signed in',
@@ -1476,7 +1774,11 @@
         'language.create': 'Language added',
         'language.update': 'Language changed',
         'language.delete': 'Language removed',
-        'translations.update': 'Translations changed'
+        'translations.update': 'Translations changed',
+        'screen_link.create': 'Screen access link made',
+        'screen_link.replace': 'Screen access link replaced',
+        'screen_link.revoke': 'Screen access link revoked',
+        'screen_link.delete': 'Screen access link removed'
       };
 
       var settingsUi = {};
@@ -1500,9 +1802,9 @@
         return group;
       }
 
-      // The Settings tab builds its own groups into `container`. Health checks and the audit log go
-      // into `healthContainer`, which is the Health & audit tab.
-      function buildSettings(container, healthContainer) {
+      // The Settings tab builds its own groups into `container`, and the Security tab into `securityContainer`. Health
+      // checks and the audit log go into `healthContainer`, which is the Health and Audit tab.
+      function buildSettings(container, healthContainer, securityContainer) {
         // Health check
         var healthPanel = el('div', 'panel');
         healthPanel.appendChild(el('h2', null, 'System health'));
@@ -1595,56 +1897,68 @@
         auditPanel.appendChild(settingsUi.auditOut);
         var activityPanels = [auditPanel];
         healthContainer.appendChild(settingsGroup('Health and tests', systemPanels));
-        // Kiosk, monitor, security, branding and audit settings are built once their values load.
-        settingsUi.appContainer = el('div', 'settings-columns');
-        container.appendChild(settingsUi.appContainer);
-        container.appendChild(settingsGroup('Old records', recordsPanels));
+        // The app settings of each tab are built once their values load.
+        settingsUi.appContainer = { settings: el('div', 'settings-columns'), security: el('div', 'settings-columns') };
+        container.appendChild(settingsUi.appContainer.settings);
+        container.appendChild(settingsGroup('Old record retention', recordsPanels));
+        securityContainer.appendChild(settingsUi.appContainer.security);
 
-        // One Save button for every setting on this tab. Run cleanup now and the logo are separate actions.
-        var saveBar = el('div', 'save-bar');
-        var saveAll = el('button', 'primary', 'Save settings');
-        saveAll.type = 'button';
-        saveAll.addEventListener('click', saveAllSettings);
-        settingsUi.saveAll = saveAll;
-        settingsUi.saveMsg = el('p', 'msg');
-        saveBar.appendChild(saveAll);
-        saveBar.appendChild(settingsUi.saveMsg);
-        container.appendChild(saveBar);
+        // Each of the two tabs has one Save button for every setting on it. Run cleanup now and the logo are separate actions.
+        settingsUi.save = {};
+        [['settings', container], ['security', securityContainer]].forEach(function (pair) {
+          var saveBar = el('div', 'save-bar');
+          var button = el('button', 'primary', 'Save settings');
+          button.type = 'button';
+          button.addEventListener('click', function () { saveSettings(pair[0]); });
+          var message = el('p', 'msg');
+          saveBar.appendChild(button);
+          saveBar.appendChild(message);
+          pair[1].appendChild(saveBar);
+          settingsUi.save[pair[0]] = { button: button, message: message };
+        });
         healthContainer.appendChild(settingsGroup('Activity', activityPanels));
       }
 
-      function loadSettingsTab() {
-        loadRetention();
-        loadAppSettings();
+      function loadSettingsTab(tab) {
+        // Opening a tab shows what is saved, so a message about an earlier save would no longer be about what is on screen.
+        settingsUi.save[tab].message.textContent = '';
+        if (tab === 'settings') loadRetention();
+        loadAppSettings(tab);
       }
 
-      // ---- Kiosk, monitor, security, branding and audit log settings ----
-      // Each group saves its own fields. The server checks every value and returns a plain message if one is wrong.
+      // ---- The settings on the Settings tab and the Security tab ----
+      // Each group belongs to one tab, and the tab's Save button saves every group on it. The server checks every value and
+      // returns a plain message if one is wrong. The groups appear in this order. The old-record retention rule is the
+      // last group on the Settings tab, and is built apart from these because it is saved through another route.
       var APP_GROUPS = [
-        { title: 'Kiosk', note: 'Kiosks pick up these changes within a minute, without a reload.', keys: ['kiosk_idle_seconds', 'kiosk_done_seconds', 'kiosk_theme', 'checkin_rate_per_minute'] },
-        { title: 'Lobby monitor', note: 'Monitors pick up these changes within a minute, without a reload. Pick at least one department for each side.', keys: ['monitor_call_seconds', 'monitor_chime', 'monitor_scroll', 'monitor_theme', 'monitor_left', 'monitor_right'] },
-        { title: 'Security and sessions', note: 'A new session length applies at each sign-in. The idle sign-out applies from each person\'s next request. Sign-in lockout counts failed attempts in the audit log.', keys: ['session_hours', 'session_idle_minutes', 'min_password_length', 'new_account_change_password', 'lockout_attempts', 'lockout_minutes'] },
-        { title: 'Branding', note: 'The organisation name appears above the page headings and in the page titles. The logo appears in the page headers. With no logo set, the headers show none.', keys: ['org_name'], logo: true },
-        { title: 'End of day', note: 'At this time each day, every ticket still waiting, called or being served is closed as removed, and the screens update. It runs once a day, using the server\'s clock, and the audit log records how many were closed. Leave blank to turn it off.', keys: ['auto_close_time'] },
-        { title: 'Audit log retention', note: 'Entries older than this are removed each day. Lockouts depend on recent failed sign-ins, so keep at least 30 days, or 0 to keep everything.', keys: ['audit_retention_days'] }
+        { tab: 'settings', title: 'Site branding', note: 'The organisation name appears above the page headings and in the page titles. The logo appears in the page headers. With no logo set, the headers show none.', keys: ['org_name'], logo: true },
+        { tab: 'settings', title: 'Kiosk configuration', note: 'Kiosks pick up these changes within a minute, without a reload.', keys: ['kiosk_idle_seconds', 'kiosk_done_seconds', 'kiosk_theme', 'checkin_rate_per_minute'] },
+        { tab: 'settings', title: 'Monitor configuration', note: 'Monitors pick up these changes within a minute, without a reload. Pick at least one department for each side.', keys: ['monitor_call_seconds', 'monitor_chime', 'monitor_scroll', 'monitor_theme', 'monitor_left', 'monitor_right'] },
+        { tab: 'settings', title: 'End of day setting', note: 'At this time each day, every ticket still waiting, called or being served is closed as removed, and the screens update. It runs once a day, using the server\'s clock, and the audit log records how many were closed. Leave blank to turn it off.', keys: ['auto_close_time'] },
+        { tab: 'security', title: 'Security and sessions', note: 'A new session length applies at each sign-in. The idle sign-out applies from each person\'s next request. Sign-in lockout counts failed attempts in the audit log.', keys: ['session_hours', 'session_idle_minutes', 'min_password_length', 'new_account_change_password', 'lockout_attempts', 'lockout_minutes'] },
+        { tab: 'security', title: 'Kiosk and monitor access', note: '', keys: ['restrict_screens'], links: true },
+        { tab: 'security', title: 'Audit log retention', note: 'Entries older than this are removed each day. Lockouts depend on recent failed sign-ins, so keep at least 30 days, or 0 to keep everything.', keys: ['audit_retention_days'] }
       ];
 
-      function loadAppSettings() {
+      // Draws the groups of one tab from the saved values. Opening a tab shows what is saved, so the other tab's unsaved
+      // changes are left as they are.
+      function loadAppSettings(tab) {
+        var box = settingsUi.appContainer[tab];
         return api('/api/admin/app-settings').then(function (data) {
           settingsUi.appData = data;
-          settingsUi.appInputs = {};
-          settingsUi.appContainer.textContent = '';
-          APP_GROUPS.forEach(function (g) {
-            settingsUi.appContainer.appendChild(settingsGroup(g.title, [buildAppPanel(g, data)]));
+          settingsUi.appInputs = settingsUi.appInputs || {};
+          box.textContent = '';
+          APP_GROUPS.filter(function (g) { return g.tab === tab; }).forEach(function (g) {
+            box.appendChild(settingsGroup(g.title, [buildAppPanel(g, data)]));
           });
         }).catch(function (err) {
-          settingsUi.appContainer.textContent = err.message;
+          box.textContent = err.message;
         });
       }
 
       function buildAppPanel(g, data) {
         var panel = el('div', 'panel');
-        panel.appendChild(el('p', 'muted', g.note));
+        if (g.note) panel.appendChild(el('p', 'muted', g.note));
         // No buttons here: the Save settings button at the foot of the tab saves every group.
         var form = el('form', 'inline');
         form.addEventListener('submit', function (e) { e.preventDefault(); });
@@ -1657,6 +1971,7 @@
         if (keyRow.childNodes.length) form.appendChild(keyRow);
         panel.appendChild(form);
         if (g.logo) panel.appendChild(logoBlock(data));
+        if (g.links) panel.appendChild(screenLinksBlock());
         return panel;
       }
 
@@ -1734,24 +2049,42 @@
         return labelled(def.label, input);
       }
 
-      // Saves every setting on the Settings tab in one go: the kiosk, monitor, security, branding and audit
-      // groups, then the old-records rule. A failure stops the save and shows the message beside the button.
-      function saveAllSettings() {
+      // Saves every setting on one tab in one go. The Settings tab saves its groups, then the old-record retention rule;
+      // the Security tab saves its groups. A failure stops the save and shows the message beside the button.
+      function saveSettings(tab) {
         if (!settingsUi.appInputs) return;
-        var btn = settingsUi.saveAll;
-        var msg = settingsUi.saveMsg;
+        var btn = settingsUi.save[tab].button;
+        var msg = settingsUi.save[tab].message;
         var r = settingsUi.retention;
         var body = {};
-        APP_GROUPS.forEach(function (g) { g.keys.forEach(function (key) { body[key] = settingsUi.appInputs[key](); }); });
+        var loaded = true;
+        APP_GROUPS.forEach(function (g) {
+          if (g.tab !== tab) return;
+          g.keys.forEach(function (key) {
+            if (settingsUi.appInputs[key]) body[key] = settingsUi.appInputs[key](); else loaded = false;
+          });
+        });
+        if (!loaded) { msg.className = 'msg'; msg.textContent = 'The settings have not loaded. Open this tab again and try once more.'; return; }
+        // Turning the lock on shuts out every kiosk and monitor that has not been given a link, so say so first.
+        if (body.restrict_screens === true && settingsUi.appData && !settingsUi.appData.values.restrict_screens) {
+          var links = settingsUi.screenLinks;
+          var active = links ? links.filter(function (l) { return !l.revokedAt; }).length : null;
+          var detail = active === null ? '' : active
+            ? ' You have ' + active + ' active access link' + (active === 1 ? '' : 's') + ': each screen has to be opened once with its link.'
+            : ' You have not made any access links yet, so every kiosk and monitor will lock.';
+          if (!confirm('Turning this on locks every kiosk and monitor until it is opened with an access link, or someone signs in on it.' + detail + ' Turn it on?')) return;
+        }
         btn.disabled = true;
         msg.className = 'msg';
         msg.textContent = '';
         api('/api/admin/app-settings', { method: 'PUT', body: JSON.stringify(body) }).then(function () {
+          if (tab !== 'settings') return;
           return api('/api/admin/settings', { method: 'PUT', body: JSON.stringify({ retentionDays: Number(r.days.value), retentionAction: r.action.value }) });
         }).then(function () {
           msg.className = 'health-ok';
           msg.textContent = 'Settings saved.';
-          loadRetention();
+          if (settingsUi.appData && 'restrict_screens' in body) settingsUi.appData.values.restrict_screens = body.restrict_screens;
+          if (tab === 'settings') loadRetention();
           loadAudit();
         }).catch(function (err) {
           msg.textContent = err.message;
@@ -1759,8 +2092,15 @@
       }
 
       // Logo: PNG, JPEG or WebP up to 300 KB. Stored in the database, so it follows the app to any host.
+      // Only this block is drawn again after an upload or removal, so settings typed but not yet saved are kept.
       function logoBlock(data) {
         var wrap = el('div', 'key-field');
+        function redraw() {
+          return api('/api/admin/app-settings').then(function (fresh) {
+            data.logoUrl = fresh.logoUrl;
+            wrap.replaceWith(logoBlock(data));
+          });
+        }
         wrap.appendChild(el('span', 'field-label', 'Logo'));
         var row = el('div', 'logo-row');
         if (data.logoUrl) {
@@ -1786,9 +2126,8 @@
           if (picked.size > 300 * 1024) { msg.textContent = 'Choose an image under 300 KB.'; file.value = ''; return; }
           var reader = new FileReader();
           reader.onload = function () {
-            api('/api/admin/logo', { method: 'PUT', body: JSON.stringify({ dataUrl: reader.result }) }).then(function () {
-              loadAppSettings();
-            }).catch(function (err) { msg.textContent = err.message; });
+            api('/api/admin/logo', { method: 'PUT', body: JSON.stringify({ dataUrl: reader.result }) }).then(redraw)
+              .catch(function (err) { msg.textContent = err.message; });
           };
           reader.readAsDataURL(picked);
         });
@@ -1798,13 +2137,205 @@
           var remove = el('button', 'secondary', 'Remove logo');
           remove.type = 'button';
           remove.addEventListener('click', function () {
-            api('/api/admin/logo', { method: 'DELETE' }).then(loadAppSettings).catch(function (err) { msg.textContent = err.message; });
+            api('/api/admin/logo', { method: 'DELETE' }).then(redraw).catch(function (err) { msg.textContent = err.message; });
           });
           upload.appendChild(remove);
         }
-        wrap.appendChild(row);
-        wrap.appendChild(upload);
+        // The logo and the buttons to change it share one line, and wrap under each other only when the window is narrow.
+        var line = el('div', 'logo-line');
+        line.appendChild(row);
+        line.appendChild(upload);
+        wrap.appendChild(line);
         wrap.appendChild(msg);
+        return wrap;
+      }
+
+      // ---- Access links for the kiosk and monitor ----
+      // With the switch above on, the kiosk and monitor open only for someone who is signed in, or for a browser that has
+      // been opened with one of these links. A link's key is shown once, when the link is made or replaced, and can never
+      // be shown again: the server keeps only a hash of it. Revoking a link locks the screens using it at once.
+      function copyText(text, done) {
+        function fallback() {
+          var box = document.createElement('textarea');
+          box.value = text;
+          box.style.position = 'fixed';
+          box.style.opacity = '0';
+          document.body.appendChild(box);
+          box.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          box.remove();
+          done(ok);
+        }
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+        else fallback();
+      }
+
+      var PANEL_CHOICES = [['full', 'Full (all departments)'], ['left', 'Left screen'], ['right', 'Right screen']];
+
+      function monitorModeText(panel) {
+        return panel === 'left' ? 'left screen' : panel === 'right' ? 'right screen' : 'full screen';
+      }
+
+      function screenLinksBlock() {
+        var wrap = el('div', 'key-field links-block');
+        wrap.appendChild(el('h4', 'links-title', 'Access links'));
+        wrap.appendChild(el('p', 'links-intro', 'Generate a unique access link for each kiosk or monitor below. Each link contains a security code that can be revoked, immediately disabling access for any client that used that link.'));
+        var formMsg = el('p', 'msg');
+        var form = el('form', 'inline');
+        var name = document.createElement('input');
+        name.maxLength = 100;
+        name.placeholder = 'e.g. Lobby kiosk';
+        name.required = true;
+        var scope = document.createElement('select');
+        [['kiosk', 'Kiosk (customers check in)'], ['monitor', 'Monitor (lobby display)']].forEach(function (o) {
+          var opt = el('option', null, o[1]);
+          opt.value = o[0];
+          scope.appendChild(opt);
+        });
+        // A monitor can show every department on one screen, or just the departments chosen for its left or right side
+        // (Settings, Monitor configuration), for a lobby with two displays. The choice is part of the address the link opens.
+        var panel = document.createElement('select');
+        PANEL_CHOICES.forEach(function (o) {
+          var opt = el('option', null, o[1]);
+          opt.value = o[0];
+          panel.appendChild(opt);
+        });
+        var panelField = labelled('Monitor mode', panel);
+        panelField.classList.add('hidden');
+        scope.addEventListener('change', function () { panelField.classList.toggle('hidden', scope.value !== 'monitor'); });
+        var make = el('button', 'primary', 'Make a link');
+        make.type = 'submit';
+        form.appendChild(labelled('Name of the screen', name));
+        form.appendChild(labelled('Kind of screen', scope));
+        form.appendChild(panelField);
+        form.appendChild(make);
+        var result = el('div');
+        var listBox = el('div');
+        wrap.appendChild(form);
+        wrap.appendChild(formMsg);
+        wrap.appendChild(result);
+        wrap.appendChild(listBox);
+
+        // The address to open on the screen. A monitor link also says which departments to show: with none given the
+        // monitor shows them all, and ?panel=left or ?panel=right shows the ones chosen for that side. The key goes after
+        // a #, which a browser never sends to the web server, so it does not end up in the host's logs.
+        function addressFor(link) {
+          var page = link.scope === 'kiosk' ? 'kiosk.html' : 'monitor.html';
+          var query = link.scope === 'monitor' && (link.panel === 'left' || link.panel === 'right') ? '?panel=' + link.panel : '';
+          return location.origin + BASE + page + query + '#key=' + encodeURIComponent(link.key);
+        }
+
+        // A new link, shown once, with a way to copy it.
+        function showResult(link, replaced) {
+          result.textContent = '';
+          var box = el('div', 'link-result');
+          var heading = el('p');
+          heading.appendChild(el('strong', null, (replaced ? 'New link for "' : 'Link for "') + link.name + '". '));
+          heading.appendChild(document.createTextNode('Copy it now. For safety it cannot be shown again; if it is lost, make a new one for the same screen.' + (replaced ? ' The old link no longer works.' : '')));
+          box.appendChild(heading);
+          if (link.scope === 'monitor') box.appendChild(el('p', 'muted', 'Opens the monitor as: ' + monitorModeText(link.panel) + '.'));
+          var code = el('code');
+          box.appendChild(code);
+          var actions = el('div', 'link-actions');
+          code.textContent = addressFor(link);
+          var copy = el('button', 'primary', 'Copy link');
+          copy.type = 'button';
+          var copied = el('span', 'muted');
+          copy.addEventListener('click', function () {
+            copyText(code.textContent, function (ok) {
+              copied.textContent = ok ? 'Copied.' : 'Select the link above and copy it.';
+              if (!ok) { var range = document.createRange(); range.selectNodeContents(code); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
+            });
+          });
+          var test = el('button', 'secondary', 'Try it in a new tab');
+          test.type = 'button';
+          test.title = 'Opens the link in this browser, which then counts as that screen too.';
+          test.addEventListener('click', function () { window.open(code.textContent, '_blank'); });
+          var done = el('button', 'secondary', 'I have copied it');
+          done.type = 'button';
+          done.addEventListener('click', function () { result.textContent = ''; });
+          actions.appendChild(copy);
+          actions.appendChild(test);
+          actions.appendChild(done);
+          actions.appendChild(copied);
+          box.appendChild(actions);
+          result.appendChild(box);
+          box.scrollIntoView({ block: 'nearest' });
+        }
+
+        function load() {
+          return api('/api/admin/screen-links').then(render).catch(function (err) { listBox.textContent = err.message; });
+        }
+
+        function act(label, path, opts, confirmText) {
+          var b = el('button', label === 'Revoke' ? 'danger' : 'secondary', label);
+          b.type = 'button';
+          b.addEventListener('click', function () {
+            if (confirmText && !confirm(confirmText)) return;
+            b.disabled = true;
+            api(path, opts).then(function (data) {
+              formMsg.textContent = '';
+              if (data && data.key) showResult(data, true);
+              return load();
+            }).catch(function (err) { formMsg.textContent = err.message; b.disabled = false; });
+          });
+          return b;
+        }
+
+        function render(links) {
+          settingsUi.screenLinks = links;
+          listBox.textContent = '';
+          if (!links.length) { listBox.appendChild(el('p', 'muted', 'No access links yet.')); return; }
+          var table = document.createElement('table');
+          table.className = 'links-table';
+          var head = document.createElement('thead');
+          head.innerHTML = '<tr><th>Name</th><th>Screen</th><th>Made</th><th>Last used</th><th>Status</th><th></th></tr>';
+          table.appendChild(head);
+          var body = document.createElement('tbody');
+          links.forEach(function (l) {
+            var tr = document.createElement('tr');
+            if (l.revokedAt) tr.className = 'inactive';
+            tr.appendChild(el('td', null, l.name));
+            tr.appendChild(el('td', null, l.scope === 'kiosk' ? 'Kiosk' : 'Monitor: ' + monitorModeText(l.panel)));
+            tr.appendChild(el('td', 'when', fmtStamp(l.createdAt) + ' by ' + l.createdBy));
+            tr.appendChild(el('td', 'when', l.lastUsedAt ? fmtStamp(l.lastUsedAt) : 'Never'));
+            var status = el('td');
+            status.appendChild(el('span', 'status-pill ' + (l.revokedAt ? 'status-closed' : 'status-open'), l.revokedAt ? 'Revoked' : 'Active'));
+            tr.appendChild(status);
+            var cell = el('td');
+            var actions = el('div', 'row-actions');
+            var id = encodeURIComponent(l.id);
+            if (!l.revokedAt) {
+              actions.appendChild(act('Revoke', '/api/admin/screen-links/' + id + '/revoke', { method: 'POST' },
+                'Revoke "' + l.name + '"? Any screen using this link locks straight away, and the link stops working.'));
+            }
+            actions.appendChild(act(l.revokedAt ? 'Make a new link' : 'New link', '/api/admin/screen-links/' + id + '/replace', { method: 'POST' },
+              'Make a new link for "' + l.name + '"? The current link stops working, so that screen has to be opened with the new one.'));
+            actions.appendChild(act('Remove', '/api/admin/screen-links/' + id, { method: 'DELETE' },
+              'Remove "' + l.name + '" from the list? Any screen using it locks straight away.'));
+            cell.appendChild(actions);
+            tr.appendChild(cell);
+            body.appendChild(tr);
+          });
+          table.appendChild(body);
+          var scroller = el('div', 'table-scroll');
+          scroller.appendChild(table);
+          listBox.appendChild(scroller);
+        }
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          formMsg.textContent = '';
+          make.disabled = true;
+          api('/api/admin/screen-links', { method: 'POST', body: JSON.stringify({ name: name.value.trim(), scope: scope.value, panel: scope.value === 'monitor' ? panel.value : 'full' }) }).then(function (link) {
+            name.value = '';
+            showResult(link, false);
+            return load();
+          }).catch(function (err) { formMsg.textContent = err.message; }).finally(function () { make.disabled = false; });
+        });
+
+        load();
         return wrap;
       }
 
@@ -1877,6 +2408,7 @@
         api('/api/admin/settings').then(function (s) {
           settingsUi.retention.days.value = s.retentionDays;
           settingsUi.retention.action.value = s.retentionAction;
+          settingsUi.retention.saved = { days: Number(s.retentionDays), action: s.retentionAction };
           settingsUi.retentionInfo.textContent = 'Last cleanup: ' + fmtStamp(s.lastCleanupAt) + '.';
         }).catch(function (err) {
           settingsUi.retentionInfo.textContent = err.message;
@@ -1884,8 +2416,15 @@
       }
 
       function runCleanupNow() {
+        // The cleanup follows the rule that is saved, not what is typed in the boxes, so the two must agree first.
+        var saved = settingsUi.retention.saved;
         var days = Number(settingsUi.retention.days.value);
-        if (!days) { alert('Set a number of days, then save, before running the cleanup.'); return; }
+        if (!saved) { alert('The saved rule has not loaded yet. Try again in a moment.'); return; }
+        if (days !== saved.days || settingsUi.retention.action.value !== saved.action) {
+          alert('The days or the action above have changed but are not saved. Press Save settings at the foot of the page first, then run the cleanup.');
+          return;
+        }
+        if (!days) { alert('Set a number of days and press Save settings first. 0 means keep everything, so there is nothing to clean up.'); return; }
         var deleting = settingsUi.retention.action.value === 'delete';
         var message = deleting
           ? 'Delete every finished ticket older than ' + days + ' days? Reports will no longer include them. This cannot be undone.'
@@ -1919,6 +2458,1034 @@
         });
       }
 
+      // ================= Service Configuration tab (admins only) =================
+      // It used to be a page of its own. Its markup is #catalog-template at the foot of this page, and its styles are
+      // scoped to #panel-catalog. It keeps its own state (cfg), apart from Management's.
+      var catalogTab = (function () {
+        var SECTIONS = ['services', 'groups', 'languages', 'translations'];
+        var currentSection = 'services';
+        var loadingCatalog = false;
+        var COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+        var MAX_TILES = 4; // tiles a kiosk row is planned for (ROW_TILES in catalog.js)
+        var cfg = { catalog: null, translations: null, trLang: '', trToken: 0, stale: false, saved: '' };
+        // Cards whose fields have been changed but not saved yet.
+        var dirtyCards = new Set();
+
+        // Management's cfgApi() signs in again when the session ended and stops on a forced password change. Anything that
+        // changes data also marks the Operations list as out of date, so it is read again when that tab is opened.
+        function cfgApi(path, opts) {
+          return api(path, opts).then(function (data) {
+            if (opts && opts.method && opts.method !== 'GET') state.servicesStale = true;
+            return data;
+          });
+        }
+
+        function setMsg(node, text, ok) {
+          node.textContent = text;
+          node.classList.toggle('ok', !!ok);
+        }
+
+        // ---- Small building blocks ----
+
+        function textInput(value, max) {
+          var i = el('input');
+          i.type = 'text';
+          if (max) i.maxLength = max;
+          i.value = value || '';
+          return i;
+        }
+
+        function numberInput(value) {
+          var i = el('input');
+          i.type = 'number';
+          i.min = '0';
+          i.max = '999';
+          i.step = '1';
+          i.value = value === undefined || value === null ? '' : String(value);
+          return i;
+        }
+
+        function checkbox(checked) {
+          var c = el('input');
+          c.type = 'checkbox';
+          c.checked = !!checked;
+          return c;
+        }
+
+        // A label above a control. `cls` is the column width, such as "c4".
+        function field(label, control, cls, hint) {
+          var l = el('label', 'field ' + (cls || ''));
+          l.appendChild(document.createTextNode(label));
+          l.appendChild(control);
+          if (hint) l.appendChild(el('span', 'hint', hint));
+          return l;
+        }
+
+        function setIcon(node, name) {
+          node.innerHTML = name && window.iconSvg ? window.iconSvg(name) : '';
+        }
+
+        function fillSelect(select, options, blank) {
+          select.textContent = '';
+          if (blank) select.appendChild(new Option(blank, ''));
+          options.forEach(function (o) { select.appendChild(new Option(o.label, o.value)); });
+        }
+
+        function groupSelect(value) {
+          var select = el('select');
+          fillSelect(select, cfg.catalog.groups.map(function (g) { return { value: g.id, label: g.label }; }), 'No department group');
+          select.value = value || '';
+          return select;
+        }
+
+        // The icon to use for a service or group: a button that opens a grid of every icon.
+        // Returns { node, value(), onChange(fn) }.
+        var openPickers = [];
+        function iconPicker(value, onChange) {
+          var current = value || '';
+          var listener = onChange || function () {};
+          var wrap = el('div', 'picker');
+          var btn = el('button', null);
+          btn.type = 'button';
+          btn.className = 'picker-btn';
+          btn.setAttribute('aria-haspopup', 'true');
+          var preview = el('span', 'icon-preview');
+          var label = el('span');
+          btn.appendChild(preview);
+          btn.appendChild(label);
+          btn.appendChild(el('span', 'caret', '▼'));
+          var pop = el('div', 'icon-pop hidden');
+
+          function show() {
+            setIcon(preview, current);
+            label.textContent = current || 'No icon';
+            Array.prototype.forEach.call(pop.children, function (b) { b.classList.toggle('selected', b.getAttribute('data-icon') === current); });
+          }
+          function choose(name) {
+            current = name;
+            show();
+            close();
+            listener(name);
+          }
+          function close() { pop.classList.add('hidden'); }
+          var none = el('button', 'none', 'None');
+          none.type = 'button';
+          none.setAttribute('data-icon', '');
+          none.title = 'No icon';
+          none.addEventListener('click', function () { choose(''); });
+          pop.appendChild(none);
+          (cfg.catalog.iconNames || []).forEach(function (name) {
+            var b = el('button');
+            b.type = 'button';
+            b.setAttribute('data-icon', name);
+            b.title = name;
+            b.setAttribute('aria-label', name);
+            setIcon(b, name);
+            b.addEventListener('click', function () { choose(name); });
+            pop.appendChild(b);
+          });
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var opening = pop.classList.contains('hidden');
+            openPickers.forEach(function (p) { p.close(); });
+            if (!opening) return;
+            pop.classList.remove('hidden');
+            pop.classList.remove('align-right');
+            if (pop.getBoundingClientRect().right > window.innerWidth - 8) pop.classList.add('align-right');
+          });
+          pop.addEventListener('click', function (e) { e.stopPropagation(); });
+          wrap.appendChild(btn);
+          wrap.appendChild(pop);
+          show();
+          openPickers.push({ close: close });
+          return { node: wrap, value: function () { return current; }, onChange: function (fn) { listener = fn; } };
+        }
+        document.addEventListener('click', function () { openPickers.forEach(function (p) { p.close(); }); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openPickers.forEach(function (p) { p.close(); }); });
+
+        // A colour swatch to pick from, with its hex value beside it. Empty means no colour.
+        function colorField(value, onChange) {
+          var wrap = el('div', 'color-field');
+          var picker = el('input');
+          picker.type = 'color';
+          picker.value = COLOR_RE.test(value || '') ? value : '#3b5bdb';
+          picker.setAttribute('aria-label', 'Pick a colour');
+          var text = textInput(value || '', 7);
+          text.placeholder = 'None';
+          text.setAttribute('aria-label', 'Colour as a hex value');
+          function sync() { wrap.classList.toggle('is-empty', !text.value.trim()); }
+          picker.addEventListener('input', function () { text.value = picker.value; sync(); if (onChange) onChange(); });
+          text.addEventListener('input', function () {
+            if (COLOR_RE.test(text.value.trim())) picker.value = text.value.trim();
+            sync();
+            if (onChange) onChange();
+          });
+          sync();
+          wrap.appendChild(picker);
+          wrap.appendChild(text);
+          return { node: wrap, value: function () { return text.value.trim(); } };
+        }
+
+        // Keeps a card's Save button and "unsaved" edge in step with its fields.
+        // `read()` returns the card's current values; Save sends only the ones that differ from `original`.
+        function trackCard(card, read, save) {
+          var original = read();
+          function changes() {
+            var now = read();
+            var out = {};
+            Object.keys(now).forEach(function (k) { if (now[k] !== original[k]) out[k] = now[k]; });
+            return out;
+          }
+          function refresh() {
+            var dirty = Object.keys(changes()).length > 0;
+            save.disabled = !dirty;
+            card.classList.toggle('is-dirty', dirty);
+            if (dirty) dirtyCards.add(card); else dirtyCards.delete(card);
+          }
+          card.addEventListener('input', refresh);
+          card.addEventListener('change', refresh);
+          refresh();
+          return {
+            changes: changes,
+            refresh: refresh,
+            saved: function () { original = read(); refresh(); }
+          };
+        }
+
+        // True when it is fine to redraw the lists: nothing is unsaved, or the person agrees to lose it.
+        function confirmDiscard() {
+          return !dirtyCards.size || confirm('Some changes on this page have not been saved. Continue and lose them?');
+        }
+
+        // Redraws the lists from the server. Cards with unsaved changes are never thrown away, so unless
+        // `force` is set nothing is redrawn while one exists; the next tab change picks the new data up.
+        function reload(force) {
+          return cfgApi('api/admin/catalog').then(function (c) {
+            cfg.catalog = c;
+            if (dirtyCards.size && !force) { cfg.stale = true; return; }
+            cfg.stale = false;
+            renderAll();
+            if (cfg.translations && !translationsDirty()) loadTranslations(true);
+          });
+        }
+
+        function renderAll() {
+          dirtyCards.clear();
+          fillSelect($('svc-new-group'), cfg.catalog.groups.map(function (g) { return { value: g.id, label: g.label }; }), 'No department group');
+          renderServices();
+          renderGroups();
+          renderLanguages();
+          updateTranslationBadge();
+          cfg.saved = '';
+        }
+
+        function langName(code) {
+          var l = cfg.catalog.languages.filter(function (x) { return x.code === code; })[0];
+          return l ? l.name : code;
+        }
+
+        // Shows on the Translations tab how many items the languages that are on still lack, so it is hard to miss.
+        function updateTranslationBadge() {
+          var total = 0;
+          cfg.catalog.languages.forEach(function (l) { if (l.enabled && l.code !== 'en' && l.untranslated) total += l.untranslated; });
+          var badge = $('tr-badge');
+          badge.textContent = total ? String(total) : '';
+          badge.title = total + (total === 1 ? ' item' : ' items') + ' still to translate';
+          badge.classList.toggle('hidden', !total);
+        }
+
+        // Opens the Translations tab for one language, showing only what is still to translate, and scrolls to one item
+        // when its key is given. The key is kept until the item is on screen, because the list may still be loading.
+        function openTranslations(lang, focusKey) {
+          if (lang && $('tr-lang').value !== lang && !translationsDirty()) {
+            $('tr-lang').value = lang;
+            cfg.trLang = lang;
+            cfg.translations = null;
+          }
+          cfg.focusKey = focusKey || '';
+          $('tr-todo').checked = true;
+          showSection('translations');
+          if (cfg.translations) { applyTodoFilter(); focusTranslation(); }
+        }
+
+        function translateService(code) {
+          var svc = cfg.catalog.services.filter(function (s) { return s.code === code; })[0];
+          var missing = svc && svc.untranslated ? svc.untranslated : [];
+          openTranslations(missing[0], 'service.' + code + '.name');
+        }
+
+        function focusTranslation() {
+          if (!cfg.focusKey) return;
+          var input = $('tr-body').querySelector('[data-key="' + cfg.focusKey + '"]');
+          if (!input) return;
+          cfg.focusKey = '';
+          input.scrollIntoView({ block: 'center' });
+          input.focus();
+        }
+
+        // After a service is added: it is already in the Translations list with nothing translated, and the kiosk shows its
+        // English text in the other languages until it is. Says so, and offers to go and translate it.
+        function offerTranslation(msg, code) {
+          var svc = cfg.catalog.services.filter(function (s) { return s.code === code; })[0];
+          var missing = svc && svc.untranslated ? svc.untranslated : [];
+          if (!missing.length) return;
+          msg.appendChild(document.createTextNode(' It is not translated into ' + missing.map(langName).join(' or ') + ' yet, so the kiosk shows its English text there. '));
+          var go = el('button', 'link-btn', 'Translate it now');
+          go.type = 'button';
+          go.addEventListener('click', function () { translateService(code); });
+          msg.appendChild(go);
+        }
+
+        // After a save the lists are drawn again, so the "Saved." note is put back on the card that was saved.
+        function flashSaved(id, msg) {
+          if (cfg.saved === id) setMsg(msg, 'Saved.', true);
+        }
+
+        // ---- Services ----
+
+        function serviceCard(s) {
+          var card = el('article', 'item-card' + (s.active ? '' : ' is-off'));
+          var preview = el('span', 'icon-preview');
+          setIcon(preview, s.icon);
+          var icon = iconPicker(s.icon, function (name) { setIcon(preview, name); card.dispatchEvent(new Event('change', { bubbles: true })); });
+          var name = textInput(s.name, 100);
+          var description = textInput(s.description, 255);
+          var group = groupSelect(s.groupId);
+          var color = colorField(s.color, function () { card.dispatchEvent(new Event('change', { bubbles: true })); });
+          var active = checkbox(s.active);
+          var asks = checkbox(s.asksAppointment);
+          var pinned = checkbox(s.pinned);
+          var save = el('button', 'primary', 'Save');
+          save.type = 'button';
+          var remove = el('button', 'danger', 'Delete');
+          remove.type = 'button';
+          var msg = el('p', 'row-msg');
+
+          var head = el('div', 'item-head');
+          head.appendChild(preview);
+          head.appendChild(el('span', 'item-code', s.code));
+          if (!s.active) head.appendChild(el('span', 'pill', 'Off'));
+          if (s.asksAppointment) head.appendChild(el('span', 'pill', 'Appointments'));
+          if (s.pinned) head.appendChild(el('span', 'pill', 'Pinned'));
+          if (s.active && s.untranslated && s.untranslated.length) {
+            var needs = el('button', 'pill warn', 'Needs translation');
+            needs.type = 'button';
+            needs.title = 'Not translated into ' + s.untranslated.map(langName).join(' or ') + ' yet, so the kiosk shows the English text there. Click to translate.';
+            needs.addEventListener('click', function () { translateService(s.code); });
+            head.appendChild(needs);
+          }
+          var notes = [];
+          if (s.hasTickets) notes.push('Has customers on record');
+          if (s.openCount) notes.push(s.openCount + ' waiting or being helped now');
+          if (notes.length) head.appendChild(el('span', 'item-note', notes.join(' · ')));
+          head.appendChild(el('span', 'spacer'));
+          var sw = el('label', 'switch');
+          sw.appendChild(active);
+          sw.appendChild(document.createTextNode('Show on kiosk'));
+          head.appendChild(sw);
+
+          var fields = el('div', 'fields');
+          fields.appendChild(field('Name', name, 'c5'));
+          fields.appendChild(field('Description', description, 'c7'));
+          fields.appendChild(field('Icon', icon.node, 'c4'));
+          fields.appendChild(field('Department group', group, 'c4'));
+          fields.appendChild(field('Monitor colour', color.node, 'c4', 'When not in a group'));
+          var options = el('div', 'option-row');
+          [[asks, 'Asks who they are seeing and the appointment time', 'The kiosk and the walk-in form ask the two questions.'],
+            [pinned, 'Always in staff watched queues', 'Staff cannot unwatch it, and it sits first in their list.']].forEach(function (o) {
+            var label = el('label', 'switch');
+            label.appendChild(o[0]);
+            var text = el('span', null, o[1]);
+            text.appendChild(el('small', null, o[2]));
+            label.appendChild(text);
+            options.appendChild(label);
+          });
+          fields.appendChild(options);
+
+          var foot = el('div', 'item-foot');
+          foot.appendChild(msg);
+          foot.appendChild(remove);
+          foot.appendChild(save);
+          card.appendChild(head);
+          card.appendChild(fields);
+          card.appendChild(foot);
+
+          flashSaved('svc:' + s.code, msg);
+          var track = trackCard(card, function () {
+            return {
+              name: name.value.trim(), description: description.value.trim(), icon: icon.value(),
+              groupId: group.value, color: color.value(), active: active.checked, asksAppointment: asks.checked, pinned: pinned.checked
+            };
+          }, save);
+
+          save.addEventListener('click', function () {
+            var body = track.changes();
+            if (body.active === false) {
+              var warning = '';
+              if (s.openCount) warning += s.openCount + ' customer(s) are waiting or being helped for ' + s.code + ' today. If you turn it off, they disappear from the queue screens. ';
+              if (s.pinned) warning += s.code + ' is pinned in every staff member\'s watched queues, and that goes with it. ';
+              if (s.asksAppointment) warning += 'Customers can no longer check in for appointments with it. ';
+              if (warning && !confirm(warning + 'Turn it off anyway?')) return;
+            }
+            save.disabled = true;
+            setMsg(msg, '');
+            cfgApi('api/admin/services/' + encodeURIComponent(s.code), { method: 'PATCH', body: JSON.stringify(body) })
+              .then(function () { track.saved(); setMsg(msg, 'Saved.', true); cfg.saved = 'svc:' + s.code; return reload(); })
+              .catch(function (err) { setMsg(msg, err.message); track.refresh(); });
+          });
+          remove.addEventListener('click', function () {
+            var extra = s.asksAppointment || s.pinned ? ' It is set up for appointments or pinned in staff queues, and that goes with it.' : '';
+            if (!confirm('Delete ' + s.code + ' (' + s.name + ')? This cannot be undone.' + extra)) return;
+            cfgApi('api/admin/services/' + encodeURIComponent(s.code), { method: 'DELETE' })
+              .then(function () { dirtyCards.delete(card); card.remove(); return reload(); })
+              .catch(function (err) { setMsg(msg, err.message); });
+          });
+          return card;
+        }
+
+        function renderList(list, items, build, emptyText) {
+          list.textContent = '';
+          if (!items.length) { list.appendChild(el('div', 'empty', emptyText)); return; }
+          items.forEach(function (item) { list.appendChild(build(item)); });
+        }
+
+        function renderServices() {
+          renderList($('svc-list'), cfg.catalog.services, serviceCard, 'No services yet. Add one above.');
+          buildBoard();
+        }
+
+        // ---- Kiosk layout board ----
+        // board.rows is the layout being worked on: a list of rows, each a list of service codes in order. It
+        // starts as the saved layout. Moving a tile only changes board.rows; Save layout sends it to the server.
+        var board = { rows: [], saved: '', services: {} };
+
+        function boardSnapshot() { return JSON.stringify(board.rows.filter(function (r) { return r.length; })); }
+
+        // Builds the board from the saved services: those turned on, grouped by their row, in the order the server
+        // lists them. A service with no row yet goes on a last row of its own.
+        function buildBoard() {
+          board.services = {};
+          var byRow = {};
+          var loose = [];
+          cfg.catalog.services.filter(function (s) { return s.active; }).forEach(function (s) {
+            board.services[s.code] = s;
+            if (s.row >= 1) (byRow[s.row] = byRow[s.row] || []).push(s.code); else loose.push(s.code);
+          });
+          board.rows = Object.keys(byRow).map(Number).sort(function (a, b) { return a - b; }).map(function (n) { return byRow[n]; });
+          if (loose.length) board.rows.push(loose);
+          board.saved = boardSnapshot();
+          renderBoard();
+          if (cfg.flashLayout) { setMsg($('layout-msg'), 'Layout saved. The kiosk has it now.', true); cfg.flashLayout = false; }
+        }
+
+        function boardChip(code) {
+          var s = board.services[code];
+          var chip = el('button', 'tile-chip');
+          chip.type = 'button';
+          chip.setAttribute('data-code', code);
+          chip.title = s.name;
+          chip.setAttribute('aria-label', code + ', ' + s.name + '. Use the arrow keys to move it.');
+          if (s.icon) {
+            var ic = el('span', 'icon-preview');
+            setIcon(ic, s.icon);
+            chip.appendChild(ic);
+          }
+          chip.appendChild(el('span', null, code));
+          chip.appendChild(el('span', 'nm', s.name));
+          chip.addEventListener('pointerdown', function (e) { startDrag(e, chip); });
+          chip.addEventListener('keydown', function (e) { moveByKey(e, code); });
+          return chip;
+        }
+
+        function renderBoard() {
+          var host = $('svc-layout');
+          host.textContent = '';
+          board.rows.forEach(function (codes, r) {
+            var line = el('div', 'board-row' + (codes.length > MAX_TILES ? ' is-long' : ''));
+            line.appendChild(el('span', 'row-label', 'Row ' + (r + 1)));
+            var zone = el('div', 'board-zone');
+            zone.setAttribute('data-row', String(r));
+            if (!codes.length) zone.appendChild(el('span', 'zone-empty', 'Empty. Drag a service here, or remove the row.'));
+            codes.forEach(function (code) { zone.appendChild(boardChip(code)); });
+            line.appendChild(zone);
+            var tools = el('div', 'board-tools');
+            var remove = el('button', null, 'Remove row');
+            remove.type = 'button';
+            remove.disabled = codes.length > 0;
+            remove.title = codes.length ? 'Move its services to another row first' : 'Remove this empty row';
+            remove.addEventListener('click', function () { board.rows.splice(r, 1); renderBoard(); });
+            tools.appendChild(remove);
+            line.appendChild(tools);
+            host.appendChild(line);
+          });
+          if (!board.rows.length) host.appendChild(el('div', 'empty', 'There are no services on the kiosk.'));
+          updateBoardState();
+        }
+
+        // The Save and Discard buttons, the warnings, and whether the page counts this panel as unsaved.
+        function updateBoardState() {
+          var box = $('svc-layout-box');
+          var dirty = boardSnapshot() !== board.saved;
+          $('layout-save').disabled = !dirty;
+          $('layout-discard').disabled = !dirty;
+          box.classList.toggle('is-dirty', dirty);
+          if (dirty) dirtyCards.add(box); else dirtyCards.delete(box);
+          var wide = [];
+          board.rows.forEach(function (codes, r) { if (codes.length > MAX_TILES) wide.push(r + 1); });
+          var text = '';
+          if (wide.length) text = 'Row ' + wide.join(', ') + (wide.length === 1 ? ' has' : ' have') + ' more than ' + MAX_TILES + ' services. They may wrap onto a second line on a smaller kiosk screen. ';
+          if (board.rows.some(function (r) { return !r.length; })) text += 'Empty rows are left out when you save. ';
+          var off = cfg.catalog.services.filter(function (s) { return !s.active; }).map(function (s) { return s.code; });
+          if (off.length) text += 'Turned off, so not shown: ' + off.join(', ') + '.';
+          $('svc-layout-note').textContent = text.trim();
+          $('svc-layout-note').classList.toggle('warn', wide.length > 0);
+          if (dirty) setMsg($('layout-msg'), '');
+        }
+
+        // Takes a service out of wherever it is and puts it at `index` in row `toRow` (or on a new row last when
+        // toRow is 'new'). `index` counts the row without the service in it.
+        function moveTile(code, toRow, index) {
+          board.rows.forEach(function (codes) {
+            var at = codes.indexOf(code);
+            if (at >= 0) codes.splice(at, 1);
+          });
+          if (toRow === 'new') board.rows.push([code]);
+          else board.rows[toRow].splice(Math.max(0, Math.min(index, board.rows[toRow].length)), 0, code);
+          renderBoard();
+        }
+
+        // Arrow keys: left and right along the row, up and down to the next row.
+        function moveByKey(e, code) {
+          var keys = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] };
+          var step = keys[e.key];
+          if (!step) return;
+          var row = -1;
+          var at = -1;
+          board.rows.forEach(function (codes, r) { if (codes.indexOf(code) >= 0) { row = r; at = codes.indexOf(code); } });
+          var toRow = row + step[0];
+          if (row < 0 || toRow < 0 || toRow >= board.rows.length) { e.preventDefault(); return; }
+          var length = board.rows[toRow].length - (toRow === row ? 1 : 0);
+          var index = toRow === row ? at + step[1] : Math.min(at, length);
+          if (index < 0 || index > length) { e.preventDefault(); return; }
+          e.preventDefault();
+          moveTile(code, toRow, index);
+          var moved = $('svc-layout').querySelector('[data-code="' + code + '"]');
+          if (moved) moved.focus();
+        }
+
+        // Where a dragged tile would land if let go at this point: a row and a place in it, or a new row.
+        function dropTarget(x, y, code) {
+          var under = document.elementFromPoint(x, y);
+          if (!under) return null;
+          if (under.closest('#layout-add-row')) return { row: 'new' };
+          var zone = under.closest('.board-zone');
+          if (!zone) {
+            var line = under.closest('.board-row');
+            zone = line && line.querySelector('.board-zone');
+          }
+          if (!zone) return null;
+          var chips = Array.prototype.filter.call(zone.querySelectorAll('.tile-chip'), function (c) { return c.getAttribute('data-code') !== code; });
+          var index = chips.length;
+          for (var i = 0; i < chips.length; i++) {
+            var b = chips[i].getBoundingClientRect();
+            if (y < b.top || (y <= b.bottom && x < b.left + b.width / 2)) { index = i; break; }
+          }
+          return { row: Number(zone.getAttribute('data-row')), index: index, zone: zone, before: chips[index] || null };
+        }
+
+        // Dragging with the pointer, so a mouse, a pen and a finger all work. A tile follows the pointer once it has
+        // moved a few pixels, and a bar shows where it would land.
+        function startDrag(e, chip) {
+          if (e.button !== undefined && e.button !== 0) return;
+          var code = chip.getAttribute('data-code');
+          var box = chip.getBoundingClientRect();
+          var offsetX = e.clientX - box.left;
+          var offsetY = e.clientY - box.top;
+          var startX = e.clientX;
+          var startY = e.clientY;
+          var ghost = null;
+          var marker = null;
+          var lastZone = null;
+
+          function clearHints() {
+            if (marker) { marker.remove(); marker = null; }
+            if (lastZone) { lastZone.classList.remove('is-over'); lastZone = null; }
+            $('layout-add-row').classList.remove('is-over');
+          }
+          function move(ev) {
+            if (!ghost) {
+              if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 6) return;
+              ghost = chip.cloneNode(true);
+              ghost.classList.add('drag-ghost');
+              ghost.style.width = box.width + 'px';
+              $('panel-catalog').appendChild(ghost);
+              chip.classList.add('is-dragging');
+            }
+            ev.preventDefault();
+            ghost.style.left = (ev.clientX - offsetX) + 'px';
+            ghost.style.top = (ev.clientY - offsetY) + 'px';
+            // Near the top or bottom of the window, scroll so a far row can be reached.
+            if (ev.clientY < 70) window.scrollBy(0, -14);
+            else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 14);
+            clearHints();
+            var target = dropTarget(ev.clientX, ev.clientY, code);
+            if (!target) return;
+            if (target.row === 'new') { $('layout-add-row').classList.add('is-over'); return; }
+            lastZone = target.zone;
+            lastZone.classList.add('is-over');
+            marker = el('span', 'drop-marker');
+            var empty = lastZone.querySelector('.zone-empty');
+            if (empty) empty.remove();
+            lastZone.insertBefore(marker, target.before);
+          }
+          function finish(ev, drop) {
+            document.removeEventListener('pointermove', move);
+            document.removeEventListener('pointerup', up);
+            document.removeEventListener('pointercancel', cancel);
+            var target = ghost && drop ? dropTarget(ev.clientX, ev.clientY, code) : null;
+            clearHints();
+            if (ghost) { ghost.remove(); chip.classList.remove('is-dragging'); }
+            if (target) moveTile(code, target.row, target.index);
+            else if (ghost) renderBoard();
+          }
+          function up(ev) { finish(ev, true); }
+          function cancel(ev) { finish(ev, false); }
+          document.addEventListener('pointermove', move);
+          document.addEventListener('pointerup', up);
+          document.addEventListener('pointercancel', cancel);
+        }
+
+        function saveBoard() {
+          var rows = board.rows.filter(function (r) { return r.length; });
+          $('layout-save').disabled = true;
+          setMsg($('layout-msg'), '');
+          cfgApi('api/admin/layout', { method: 'PUT', body: JSON.stringify({ rows: rows }) })
+            .then(function () {
+              board.rows = rows;
+              board.saved = boardSnapshot();
+              cfg.flashLayout = true;
+              updateBoardState();
+              return reload();
+            })
+            .then(function () { if (cfg.flashLayout) { renderBoard(); setMsg($('layout-msg'), 'Layout saved. The kiosk has it now.', true); cfg.flashLayout = false; } })
+            .catch(function (err) { setMsg($('layout-msg'), err.message); updateBoardState(); });
+        }
+
+        // ---- Department groups ----
+
+        function groupCard(g) {
+          var card = el('article', 'item-card');
+          var preview = el('span', 'icon-preview');
+          setIcon(preview, g.icon);
+          var label = textInput(g.label, 100);
+          var icon = iconPicker(g.icon, function (name) { setIcon(preview, name); card.dispatchEvent(new Event('change', { bubbles: true })); });
+          var color = colorField(g.color, function () { card.dispatchEvent(new Event('change', { bubbles: true })); });
+          var order = numberInput(g.sortOrder);
+          var save = el('button', 'primary', 'Save');
+          save.type = 'button';
+          var remove = el('button', 'danger', 'Delete');
+          remove.type = 'button';
+          var msg = el('p', 'row-msg');
+          var count = g.codes.length;
+
+          var head = el('div', 'item-head');
+          head.appendChild(preview);
+          head.appendChild(el('span', 'item-code', g.id));
+          head.appendChild(el('span', 'item-note', count + (count === 1 ? ' service' : ' services') + (count ? ': ' + g.codes.join(', ') : '')));
+
+          var fields = el('div', 'fields');
+          fields.appendChild(field('Name', label, 'c5'));
+          fields.appendChild(field('Icon', icon.node, 'c3'));
+          fields.appendChild(field('Colour', color.node, 'c3'));
+          fields.appendChild(field('List order', order, 'c2', 'In Settings'));
+
+          var foot = el('div', 'item-foot');
+          foot.appendChild(msg);
+          foot.appendChild(remove);
+          foot.appendChild(save);
+          card.appendChild(head);
+          card.appendChild(fields);
+          card.appendChild(foot);
+
+          flashSaved('grp:' + g.id, msg);
+          var track = trackCard(card, function () {
+            return { label: label.value.trim(), icon: icon.value(), color: color.value(), sortOrder: order.value.trim() };
+          }, save);
+
+          save.addEventListener('click', function () {
+            save.disabled = true;
+            setMsg(msg, '');
+            cfgApi('api/admin/groups/' + encodeURIComponent(g.id), { method: 'PATCH', body: JSON.stringify(track.changes()) })
+              .then(function () { track.saved(); setMsg(msg, 'Saved.', true); cfg.saved = 'grp:' + g.id; return reload(); })
+              .catch(function (err) { setMsg(msg, err.message); track.refresh(); });
+          });
+          remove.addEventListener('click', function () {
+            if (!confirm('Delete the department group "' + g.label + '"?')) return;
+            cfgApi('api/admin/groups/' + encodeURIComponent(g.id), { method: 'DELETE' })
+              .then(function () { dirtyCards.delete(card); card.remove(); return reload(); })
+              .catch(function (err) { setMsg(msg, err.message); });
+          });
+          return card;
+        }
+
+        function renderGroups() {
+          renderList($('grp-list'), cfg.catalog.groups, groupCard, 'No department groups yet. Add one above.');
+        }
+
+        // ---- Languages ----
+
+        function languageCard(l) {
+          var card = el('article', 'item-card' + (l.enabled ? '' : ' is-off'));
+          var name = textInput(l.name, 50);
+          var enabled = checkbox(l.enabled);
+          var isEnglish = l.code === 'en';
+          if (isEnglish) enabled.disabled = true;
+          var save = el('button', 'primary', 'Save');
+          save.type = 'button';
+          var msg = el('p', 'row-msg');
+
+          var head = el('div', 'item-head');
+          head.appendChild(el('span', 'item-code', l.code));
+          if (isEnglish) head.appendChild(el('span', 'item-note', 'Always on'));
+          if (!isEnglish) {
+            var todo = l.untranslated || 0;
+            if (todo) {
+              var more = el('button', 'link-btn', todo + (todo === 1 ? ' item' : ' items') + ' still to translate');
+              more.type = 'button';
+              more.addEventListener('click', function () { openTranslations(l.code, ''); });
+              head.appendChild(more);
+            } else {
+              head.appendChild(el('span', 'item-note', 'Fully translated'));
+            }
+          }
+          head.appendChild(el('span', 'spacer'));
+          var sw = el('label', 'switch');
+          sw.appendChild(enabled);
+          sw.appendChild(document.createTextNode('Show on kiosk'));
+          head.appendChild(sw);
+
+          var fields = el('div', 'fields');
+          fields.appendChild(field('Name, as people in that language write it', name, 'c6'));
+          var foot = el('div', 'item-foot');
+          foot.appendChild(msg);
+          if (!isEnglish) {
+            var remove = el('button', 'danger', 'Delete');
+            remove.type = 'button';
+            remove.title = 'Delete this language and its translations. To keep them, turn it off instead.';
+            remove.addEventListener('click', function () {
+              if (!confirm('Delete ' + l.name + ' and every translation in it? This cannot be undone. To keep the translations, turn the language off instead.')) return;
+              cfgApi('api/admin/languages/' + encodeURIComponent(l.code), { method: 'DELETE' })
+                .then(function () { dirtyCards.delete(card); if (cfg.trLang === l.code) { cfg.trLang = ''; cfg.translations = null; } card.remove(); return reload(); })
+                .catch(function (err) { setMsg(msg, err.message); });
+            });
+            foot.appendChild(remove);
+          }
+          foot.appendChild(save);
+          card.appendChild(head);
+          card.appendChild(fields);
+          card.appendChild(foot);
+
+          flashSaved('lang:' + l.code, msg);
+          var track = trackCard(card, function () { return { name: name.value.trim(), enabled: enabled.checked }; }, save);
+          save.addEventListener('click', function () {
+            save.disabled = true;
+            setMsg(msg, '');
+            cfgApi('api/admin/languages/' + encodeURIComponent(l.code), { method: 'PATCH', body: JSON.stringify(track.changes()) })
+              .then(function () { track.saved(); setMsg(msg, 'Saved.', true); cfg.saved = 'lang:' + l.code; return reload(); })
+              .catch(function (err) { setMsg(msg, err.message); track.refresh(); });
+          });
+          return card;
+        }
+
+        function renderLanguages() {
+          renderList($('lang-list'), cfg.catalog.languages, languageCard, 'No languages.');
+          var select = $('tr-lang');
+          var others = cfg.catalog.languages.filter(function (l) { return l.code !== 'en'; });
+          var keep = cfg.trLang;
+          fillSelect(select, others.map(function (l) { return { value: l.code, label: l.name + ' (' + l.code + ')' }; }));
+          if (keep && others.some(function (l) { return l.code === keep; })) select.value = keep;
+          cfg.trLang = select.value;
+          $('tr-save').disabled = !select.value;
+        }
+
+        // ---- Translations ----
+
+        function trInputs() { return $('tr-body').querySelectorAll('[data-key]'); }
+
+        function translationsDirty() {
+          if (!cfg.translations) return false;
+          return Array.prototype.some.call(trInputs(), function (i) {
+            return i.value.trim() !== (cfg.translations.original[i.getAttribute('data-key')] || '').trim();
+          });
+        }
+
+        // `quiet` redraws without the "Loading" flash, for a reload after saving.
+        function loadTranslations(quiet) {
+          var lang = $('tr-lang').value;
+          cfg.trLang = lang;
+          var body = $('tr-body');
+          $('tr-head').classList.toggle('hidden', !lang);
+          if (!lang) { cfg.translations = null; body.textContent = 'Add a language first.'; $('tr-count').textContent = ''; return; }
+          if (!quiet) body.textContent = 'Loading…';
+          var token = ++cfg.trToken;
+          cfgApi('api/admin/translations?lang=' + encodeURIComponent(lang))
+            .then(function (data) {
+              if (token !== cfg.trToken) return; // a newer request has replaced this one
+              cfg.translations = { lang: data.lang, items: data.items, original: {} };
+              renderTranslations();
+            })
+            .catch(function (err) { if (token === cfg.trToken) body.textContent = err.message; });
+        }
+
+        function renderTranslations() {
+          var t = cfg.translations;
+          var body = $('tr-body');
+          body.textContent = '';
+          var section = null;
+          t.items.forEach(function (item) {
+            if (item.section !== section) {
+              section = item.section;
+              body.appendChild(el('div', 'section-title', section));
+            }
+            t.original[item.key] = item.value;
+            var row = el('div', 'translate-item');
+            row.setAttribute('data-section', item.section);
+            row.appendChild(el('span', 't-label', item.label));
+            row.appendChild(el('span', 'english', item.english || ''));
+            // A translation is often longer than the English, so a long one gets room to wrap.
+            var long = Math.max((item.english || '').length, item.value.length) > 50;
+            var input = long ? el('textarea') : el('input');
+            if (long) input.rows = 2; else input.type = 'text';
+            input.value = item.value;
+            input.placeholder = item.english || '';
+            input.maxLength = 500;
+            input.setAttribute('data-key', item.key);
+            input.setAttribute('aria-label', 'Translation of ' + item.label);
+            row.appendChild(input);
+            body.appendChild(row);
+          });
+          applyTodoFilter();
+          updateTranslationCount();
+          focusTranslation();
+        }
+
+        // Reads the catalogue again for its translation counts only, so the pills, notes and the badge follow what was just
+        // saved. The lists are drawn again only when nothing on a card is unsaved, so nothing typed there is thrown away,
+        // and the Translations list itself is left alone, so nothing being typed in it is either.
+        function refreshTranslationCounts() {
+          return cfgApi('api/admin/catalog').then(function (c) {
+            cfg.catalog.languages.forEach(function (l) {
+              var fresh = c.languages.filter(function (x) { return x.code === l.code; })[0];
+              l.untranslated = fresh ? fresh.untranslated : undefined;
+            });
+            cfg.catalog.services.forEach(function (s) {
+              var fresh = c.services.filter(function (x) { return x.code === s.code; })[0];
+              s.untranslated = fresh ? fresh.untranslated : [];
+            });
+            updateTranslationBadge();
+            if (!dirtyCards.size) { renderServices(); renderLanguages(); }
+          });
+        }
+
+        // Marks which rows are already translated, so "only items still to translate" can hide them. The marks are
+        // taken when the filter is switched on or the list is drawn, not while typing, so a row does not vanish under the cursor.
+        function applyTodoFilter() {
+          var body = $('tr-body');
+          var rows = body.querySelectorAll('.translate-item');
+          var sections = {};
+          Array.prototype.forEach.call(rows, function (row) {
+            var input = row.querySelector('[data-key]');
+            var done = input.value.trim() !== '';
+            row.classList.toggle('is-done', done);
+            var s = row.getAttribute('data-section');
+            if (!done) sections[s] = true;
+          });
+          Array.prototype.forEach.call(body.querySelectorAll('.section-title'), function (title) {
+            title.classList.toggle('is-done', !sections[title.textContent]);
+          });
+          body.classList.toggle('only-todo', $('tr-todo').checked);
+        }
+
+        function updateTranslationCount() {
+          if (!cfg.translations) return;
+          var inputs = trInputs();
+          var done = Array.prototype.filter.call(inputs, function (i) { return i.value.trim() !== ''; }).length;
+          $('tr-count').textContent = done + ' of ' + inputs.length + ' translated';
+          Array.prototype.forEach.call(inputs, function (i) {
+            var changed = i.value.trim() !== (cfg.translations.original[i.getAttribute('data-key')] || '').trim();
+            i.closest('.translate-item').classList.toggle('is-changed', changed);
+          });
+        }
+
+        function saveTranslations() {
+          if (!cfg.translations) return;
+          var values = {};
+          Array.prototype.forEach.call(trInputs(), function (i) {
+            var key = i.getAttribute('data-key');
+            var now = i.value.trim();
+            if (now !== (cfg.translations.original[key] || '').trim()) values[key] = now;
+          });
+          var count = Object.keys(values).length;
+          if (!count) { setMsg($('tr-msg'), 'Nothing to save.', true); return; }
+          $('tr-save').disabled = true;
+          setMsg($('tr-msg'), '');
+          cfgApi('api/admin/translations', { method: 'PUT', body: JSON.stringify({ lang: cfg.translations.lang, values: values }) })
+            .then(function () {
+              setMsg($('tr-msg'), 'Saved ' + count + ' change' + (count === 1 ? '' : 's') + '.', true);
+              loadTranslations(true);
+              refreshTranslationCounts().catch(function () { /* the counts catch up the next time the page is opened */ });
+            })
+            .catch(function (err) { setMsg($('tr-msg'), err.message); })
+            .then(function () { $('tr-save').disabled = !$('tr-lang').value; });
+        }
+
+        // ---- Adding ----
+
+        var newSvcIcon, newSvcColor, newGrpIcon, newGrpColor;
+
+        function buildAddFields() {
+          newSvcIcon = iconPicker('');
+          newSvcColor = colorField('');
+          newGrpIcon = iconPicker('');
+          newGrpColor = colorField('');
+          $('svc-new-icon-slot').textContent = '';
+          $('svc-new-color-slot').textContent = '';
+          $('grp-new-icon-slot').textContent = '';
+          $('grp-new-color-slot').textContent = '';
+          $('svc-new-icon-slot').appendChild(newSvcIcon.node);
+          $('svc-new-color-slot').appendChild(newSvcColor.node);
+          $('grp-new-icon-slot').appendChild(newGrpIcon.node);
+          $('grp-new-color-slot').appendChild(newGrpColor.node);
+        }
+
+        function addService() {
+          if (!confirmDiscard()) return;
+          var body = {
+            code: $('svc-new-code').value.trim(),
+            name: $('svc-new-name').value.trim(),
+            description: $('svc-new-description').value.trim(),
+            icon: newSvcIcon.value(),
+            groupId: $('svc-new-group').value,
+            color: newSvcColor.value(),
+            asksAppointment: $('svc-new-appt').checked,
+            pinned: $('svc-new-pinned').checked
+          };
+          var msg = $('svc-add-msg');
+          setMsg(msg, '');
+          cfgApi('api/admin/services', { method: 'POST', body: JSON.stringify(body) })
+            .then(function () {
+              setMsg(msg, 'Added ' + body.code.toUpperCase() + '. It shows on the kiosk now.', true);
+              ['svc-new-code', 'svc-new-name', 'svc-new-description'].forEach(function (id) { $(id).value = ''; });
+              $('svc-new-appt').checked = false;
+              $('svc-new-pinned').checked = false;
+              return reload(true).then(buildAddFields).then(function () { offerTranslation(msg, body.code.toUpperCase()); });
+            })
+            .catch(function (err) { setMsg(msg, err.message); });
+        }
+
+        function addGroup() {
+          if (!confirmDiscard()) return;
+          var body = {
+            id: $('grp-new-id').value.trim().toLowerCase(),
+            label: $('grp-new-label').value.trim(),
+            icon: newGrpIcon.value(),
+            color: newGrpColor.value()
+          };
+          var msg = $('grp-add-msg');
+          setMsg(msg, '');
+          cfgApi('api/admin/groups', { method: 'POST', body: JSON.stringify(body) })
+            .then(function () {
+              setMsg(msg, 'Added ' + body.label + '.', true);
+              ['grp-new-id', 'grp-new-label'].forEach(function (id) { $(id).value = ''; });
+              return reload(true).then(buildAddFields);
+            })
+            .catch(function (err) { setMsg(msg, err.message); });
+        }
+
+        function addLanguage() {
+          if (!confirmDiscard()) return;
+          var body = { code: $('lang-new-code').value.trim().toLowerCase(), name: $('lang-new-name').value.trim() };
+          var msg = $('lang-add-msg');
+          setMsg(msg, '');
+          cfgApi('api/admin/languages', { method: 'POST', body: JSON.stringify(body) })
+            .then(function () {
+              setMsg(msg, 'Added ' + body.name + '. Now translate it on the Translations tab.', true);
+              $('lang-new-code').value = '';
+              $('lang-new-name').value = '';
+              cfg.trLang = body.code;
+              return reload(true);
+            })
+            .catch(function (err) { setMsg(msg, err.message); });
+        }
+
+        // ---- Loading and tabs ----
+
+        function showSection(tab) {
+          currentSection = tab;
+          SECTIONS.forEach(function (t) { $('cfg-panel-' + t).classList.toggle('hidden', t !== tab); });
+          document.querySelectorAll('.subtab-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+          if (tab !== 'translations') cfg.focusKey = '';
+          // A redraw held back by unsaved changes happens once they are saved or lost.
+          if (cfg.stale && !dirtyCards.size) reload().catch(function () {});
+          if (tab === 'translations' && !cfg.translations) loadTranslations();
+        }
+
+        function wire() {
+          Array.prototype.forEach.call(document.querySelectorAll('#panel-catalog .subtab-btn'), function (b) {
+            b.addEventListener('click', function () { showSection(b.dataset.tab); });
+          });
+        $('svc-add').addEventListener('click', addService);
+        $('layout-save').addEventListener('click', saveBoard);
+        $('layout-discard').addEventListener('click', function () { setMsg($('layout-msg'), ''); buildBoard(); });
+        $('layout-add-row').addEventListener('click', function () { board.rows.push([]); renderBoard(); });
+        $('grp-add').addEventListener('click', addGroup);
+        $('lang-add').addEventListener('click', addLanguage);
+        $('tr-lang').addEventListener('change', function () {
+          if (translationsDirty() && !confirm('Some translations have not been saved. Switch language and lose them?')) {
+            $('tr-lang').value = cfg.trLang;
+            return;
+          }
+          cfg.translations = null;
+          loadTranslations();
+        });
+        $('tr-todo').addEventListener('change', applyTodoFilter);
+        $('tr-body').addEventListener('input', updateTranslationCount);
+        $('tr-save').addEventListener('click', saveTranslations);
+        window.addEventListener('beforeunload', function (e) {
+          if (dirtyCards.size || translationsDirty()) { e.preventDefault(); e.returnValue = ''; }
+        });
+        }
+
+        // Draws the tab into its panel. Called once, for an admin. The lists load when the tab is first opened.
+        function init(panel) {
+          panel.appendChild(document.getElementById('catalog-template').content.cloneNode(true));
+          wire();
+        }
+
+        // Called each time the tab is opened. The first time loads the lists; after that they are read again, and
+        // anything with unsaved changes is left as it is.
+        function show() {
+          if (cfg.catalog) { reload().catch(function () {}); return; }
+          if (loadingCatalog) return;
+          loadingCatalog = true;
+          cfgApi('api/admin/catalog').then(function (c) {
+            cfg.catalog = c;
+            $('cfg-load-msg').classList.add('hidden');
+            buildAddFields();
+            renderAll();
+            document.querySelector('#panel-catalog .subtabs').classList.remove('hidden');
+            $('cfg-body').classList.remove('hidden');
+            showSection(currentSection);
+          }).catch(function (err) {
+            var m = $('cfg-load-msg');
+            m.textContent = err.message;
+            m.classList.remove('hidden');
+          }).then(function () { loadingCatalog = false; });
+        }
+
+        return { init: init, show: show };
+      })();
+
       // ================= Tabs & boot =================
 
       function showTab(tab) {
@@ -1933,7 +3500,10 @@
         history.replaceState(null, '', location.pathname + '?' + params.toString());
         // The report reloads each time its tab is opened, so it always shows current data.
         if (tab === 'reports') loadReportRange();
-        if (tab === 'settings') loadSettingsTab();
+        if (tab === 'catalog') catalogTab.show();
+        // The Service Configuration tab may have changed services since the list was read.
+        if (tab === 'services' && state.servicesStale) { state.servicesStale = false; loadServices().catch(function (err) { alert(err.message); }); }
+        if (tab === 'settings' || tab === 'security') loadSettingsTab(tab);
         if (tab === 'health') loadAudit();
       }
 
@@ -1983,7 +3553,13 @@
         var healthTab = app.lastChild;
         app.appendChild(el('div', 'tab-panel hidden', undefined));
         app.lastChild.id = 'panel-settings';
-        buildSettings(app.lastChild, healthTab);
+        var settingsTab = app.lastChild;
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-security';
+        buildSettings(settingsTab, healthTab, app.lastChild);
+        app.appendChild(el('div', 'tab-panel hidden', undefined));
+        app.lastChild.id = 'panel-catalog';
+        if (availableTabs.indexOf('catalog') >= 0) catalogTab.init(app.lastChild);
 
         try {
           var toLoad = [];
@@ -1996,7 +3572,6 @@
         }
 
         $('tabs').classList.remove('hidden');
-        $('catalog-link').classList.toggle('hidden', state.user.role !== 'admin');
         var requested = new URLSearchParams(location.search).get('tab');
         showTab(availableTabs.indexOf(requested) >= 0 ? requested : availableTabs[0]);
       })();

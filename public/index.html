@@ -47,7 +47,7 @@
 <body>
   <header class="top">
     <div class="brand">
-      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.remove()"></span>
+      <span class="logo-wrap"><img class="logo" alt="" style="visibility:hidden" onerror="this.parentNode.style.display='none'"></span>
       <div>
         <p class="org-label" data-org-name hidden></p>
         <h1>Lobby Check-In</h1>
@@ -83,7 +83,7 @@
       </form>
     </section>
 
-    <!-- Shown once signed in. Signing in itself takes you straight to the queue portal. -->
+    <!-- Shown to a signed-in admin, who stays on this page with every option. Staff and managers go straight to the queue portal. -->
     <section class="card hidden" id="signed-in-card">
       <h2>Signed in</h2>
       <p class="muted" id="signed-in-as"></p>
@@ -95,7 +95,8 @@
       </div>
     </section>
 
-    <section class="card">
+    <!-- Shown when the kiosk and monitor are open to anyone. With them locked (Security) it is hidden until an admin signs in. -->
+    <section class="card hidden" id="screens-card">
       <h2>Public screens</h2>
       <p class="muted">No sign-in needed.</p>
       <div class="link-list">
@@ -105,11 +106,11 @@
         </a>
         <a href="monitor.html?panel=left">
           <strong>Queue monitor: Left</strong>
-          <span>Planning &amp; Zoning, Code Compliance, Business Tax Receipts</span>
+          <span id="panel-left-desc">The departments chosen for the left screen</span>
         </a>
         <a href="monitor.html?panel=right">
           <strong>Queue monitor: Right</strong>
-          <span>Building Dept., Records &amp; Alarms, Appointment Check-In</span>
+          <span id="panel-right-desc">The departments chosen for the right screen</span>
         </a>
         <a href="monitor.html">
           <strong>Queue monitor: All services</strong>
@@ -142,16 +143,27 @@
 
       // Other staff pages send people here to sign in, with ?next= naming the page to return to.
       // Only the staff pages are accepted, so the parameter can't send anyone elsewhere.
-      var NEXT_PAGES = ['queue.html', 'manage.html', 'account.html', 'catalog.html'];
+      // The staff pages, and the kiosk and monitor (which a monitor may name the side of) for when they are locked.
+      var NEXT_PAGE = /^(queue|manage|account|kiosk|monitor)\.html(\?panel=(left|right))?$/;
       function nextPage() {
         var next = new URLSearchParams(location.search).get('next');
-        return NEXT_PAGES.indexOf(next) >= 0 ? next : null;
+        return NEXT_PAGE.test(next || '') ? next : null;
       }
+
+      // The list of kiosk and monitor links shows while they are open to anyone. Once an admin has locked them (Security),
+      // nobody sees it before signing in, and an admin who has signed in sees it among the options.
+      var screensLocked = false;
+      var adminHere = false;
+      function updateScreensList() { $('screens-card').classList.toggle('hidden', screensLocked && !adminHere); }
 
       function showSignedIn(user) {
         if (user.mustChangePassword) { window.location.href = BASE + 'account.html'; return; }
         // Arrived here to sign in, and already signed in: carry on to the page they wanted.
         if (nextPage()) { window.location.href = BASE + nextPage(); return; }
+        // Staff and managers have no use for this page: their work is in the queue portal.
+        if (user.role !== 'admin') { window.location.href = BASE + 'queue.html'; return; }
+        adminHere = true;
+        updateScreensList();
         $('signin-card').classList.add('hidden');
         $('signed-in-card').classList.remove('hidden');
         $('signed-in-as').textContent = 'Signed in as ' + user.displayName + ' (' + ROLE_LABEL[user.role] + ').';
@@ -162,6 +174,8 @@
       }
 
       function showSignedOut() {
+        adminHere = false;
+        updateScreensList();
         $('header-manage').classList.add('hidden');
         $('header-signout').classList.add('hidden');
         $('signed-in-card').classList.add('hidden');
@@ -184,8 +198,14 @@
           });
           // The queue portal reads the counter name from this browser, so save it before going there.
           try { localStorage.setItem('staffCounter', counter); } catch (ignored) { /* storage unavailable */ }
-          // A forced password change comes first.
-          window.location.href = BASE + (user.mustChangePassword ? 'account.html' : (nextPage() || 'queue.html'));
+          // A forced password change comes first. Then the page they came for. Otherwise staff and managers go to the queue
+          // portal, and an admin stays here, with every option.
+          if (user.mustChangePassword) { window.location.href = BASE + 'account.html'; return; }
+          if (nextPage()) { window.location.href = BASE + nextPage(); return; }
+          if (user.role !== 'admin') { window.location.href = BASE + 'queue.html'; return; }
+          $('password').value = '';
+          $('signin-submit').disabled = false;
+          showSignedIn(user);
         } catch (error) {
           err.textContent = error.message;
           $('password').value = '';
@@ -197,6 +217,34 @@
         api('api/auth/logout', { method: 'POST' }).catch(function () {}).then(showSignedOut);
       });
       $('header-signout').addEventListener('click', function () { $('signout').click(); });
+
+      // The left and right monitors show the departments chosen in Settings, so the line under each link is read from
+      // there rather than written here. If it cannot be read, the plain description stays.
+      function describePanel(keys, groups, services) {
+        return keys.map(function (key) {
+          var group = groups.filter(function (g) { return g.id === key; })[0];
+          if (group) return group.label;
+          var service = services.filter(function (s) { return s.code === key; })[0];
+          return service ? service.name : null;
+        }).filter(Boolean).join(', ');
+      }
+      // Are the kiosk and monitor locked (Security)? If so, the list waits for an admin to sign in. If the answer cannot be
+      // read, it shows, as it did before.
+      fetch(BASE + 'api/access/status?screen=kiosk', { cache: 'no-store' })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (status) { screensLocked = !!(status && status.restricted); updateScreensList(); })
+        .catch(function () { updateScreensList(); });
+      // app-settings.js loads after this script, so wait for the page to finish loading before using it.
+      window.addEventListener('load', function () {
+        window.appSettingsReady.then(function (settings) {
+          return Promise.all([api('api/catalog'), api('api/services')]).then(function (data) {
+            ['left', 'right'].forEach(function (side) {
+              var text = describePanel(settings['monitor_' + side] || [], data[0].groups, data[1]);
+              if (text) $('panel-' + side + '-desc').textContent = text;
+            });
+          });
+        }).catch(function () { /* the plain description stays */ });
+      });
 
       // Already signed in on this browser? Offer the portal rather than sending them there unasked.
       $('counter').value = (function () { try { return localStorage.getItem('staffCounter') || ''; } catch (e) { return ''; } })();

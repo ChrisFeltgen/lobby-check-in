@@ -298,8 +298,9 @@
     #panel-catalog details.add { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
     #panel-catalog details.add > summary { cursor: pointer; padding: 12px 18px; font-weight: 700; font-size: 15px; list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 10px; }
     #panel-catalog details.add > summary::-webkit-details-marker { display: none; }
-    #panel-catalog details.add > summary::before { content: "+"; display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: var(--accent-fg); font-size: 16px; line-height: 1; }
-    #panel-catalog details.add[open] > summary::before { content: "–"; }
+    /* The plus and minus are drawn with gradients, not text, so they sit exactly in the middle of the circle. */
+    #panel-catalog details.add > summary::before { content: ""; display: inline-block; flex: none; width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(var(--accent-fg), var(--accent-fg)) center / 10px 2px no-repeat, linear-gradient(var(--accent-fg), var(--accent-fg)) center / 2px 10px no-repeat, var(--accent); }
+    #panel-catalog details.add[open] > summary::before { background: linear-gradient(var(--accent-fg), var(--accent-fg)) center / 10px 2px no-repeat, var(--accent); }
     #panel-catalog details.add > summary:hover { background: var(--bg); }
     #panel-catalog details.add .add-body { padding: 4px 18px 16px; border-top: 1px solid var(--border); padding-top: 14px; }
     #panel-catalog .form-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
@@ -342,12 +343,13 @@
     #panel-catalog .board-row { display: flex; align-items: stretch; gap: 10px; }
     #panel-catalog .board-row .row-label { flex: none; width: 58px; padding-top: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
     #panel-catalog .board-row.is-long .row-label { color: var(--danger); }
-    #panel-catalog .board-zone { flex: 1; min-width: 0; min-height: 60px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px; background: var(--bg); }
+    /* A row stays on one line here; if its services are too wide to fit, the row scrolls sideways. */
+    #panel-catalog .board-zone { flex: 1; min-width: 0; min-height: 60px; display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: center; justify-content: safe center; gap: 8px; padding: 8px;border: 1px dashed var(--border); border-radius: 10px; background: var(--bg); }
     #panel-catalog .board-zone.is-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
     #panel-catalog .board-zone .zone-empty { font-size: 13px; color: var(--muted); padding: 0 6px; }
     #panel-catalog .board-tools { flex: none; display: flex; align-items: center; }
     #panel-catalog .board-tools button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
-    #panel-catalog .tile-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 250px; min-height: 0; padding: 7px 12px 7px 8px; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px; background: var(--card); color: var(--fg); font-size: 14px; font-weight: 600; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #panel-catalog .tile-chip { display: inline-flex; flex: none; align-items: center; gap: 8px; max-width: 250px;min-height: 0; padding: 7px 12px 7px 8px; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px; background: var(--card); color: var(--fg); font-size: 14px; font-weight: 600; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
     #panel-catalog .tile-chip:hover { border-color: var(--accent); }
     #panel-catalog .tile-chip .icon-preview { width: 20px; height: 20px; }
     #panel-catalog .tile-chip .icon-preview svg { width: 18px; height: 18px; }
@@ -2919,7 +2921,6 @@
             setIcon(ic, s.icon);
             chip.appendChild(ic);
           }
-          chip.appendChild(el('span', null, code));
           chip.appendChild(el('span', 'nm', s.name));
           chip.addEventListener('pointerdown', function (e) { startDrag(e, chip); });
           chip.addEventListener('keydown', function (e) { moveByKey(e, code); });

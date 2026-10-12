@@ -140,6 +140,11 @@
 
     /* Services tab: one card per service, in a grid so the list needs less scrolling. */
     #panel-services { display: flex; flex-direction: column; gap: 14px; }
+    .open-screens { display: flex; flex-direction: column; gap: 10px; }
+    .open-screens h2 { margin: 0; }
+    .open-screens-links { display: flex; flex-wrap: wrap; gap: 8px; }
+    .open-screen-btn { display: inline-flex; align-items: center; min-height: 38px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); font-weight: 600; text-decoration: none; }
+    .open-screen-btn:hover { background: var(--bg); }
     .svc-toolbar { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
     .svc-search { flex: 1 1 220px; max-width: 340px; min-height: 38px; padding: 6px 10px; font-size: 15px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
     .svc-filters { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -1038,10 +1043,34 @@
         });
       }
 
+      // Links to the kiosk and the monitor (every department, or the left or right side). A signed-in manager or admin
+      // may open them even when the screens are locked. Each opens in its own tab, so this page stays where it is.
+      function buildOpenScreens(panel) {
+        var box = el('div', 'panel open-screens');
+        box.appendChild(el('h2', null, 'Open a screen'));
+        box.appendChild(el('p', 'muted', 'Opens the kiosk or a monitor in a new tab on this computer. Use it to check a screen, or to set one up here.'));
+        var links = el('div', 'open-screens-links');
+        [
+          ['Kiosk', 'kiosk.html'],
+          ['Monitor: all services', 'monitor.html'],
+          ['Monitor: left', 'monitor.html?panel=left'],
+          ['Monitor: right', 'monitor.html?panel=right']
+        ].forEach(function (pair) {
+          var a = el('a', 'open-screen-btn', pair[0]);
+          a.href = BASE + pair[1];
+          a.target = '_blank';
+          a.rel = 'noopener';
+          links.appendChild(a);
+        });
+        box.appendChild(links);
+        panel.appendChild(box);
+      }
+
       function renderServicesTab() {
         var panel = $('panel-services');
         if (!$('svc-sections')) {
           panel.textContent = '';
+          buildOpenScreens(panel);
           buildServicesToolbar(panel);
         }
         renderServiceList();

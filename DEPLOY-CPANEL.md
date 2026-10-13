@@ -80,17 +80,11 @@ Leave this page open. You'll come back to it in the next steps.
 
 1. On the same Node.js App page, find your app and click **Run NPM Install**.
 2. Wait until it says it has finished.
-3. Check that a folder called `node_modules` now exists inside `virtual-queue`, and that it contains a folder called `express`.
+3. Check that the host created `node_modules` inside `virtual-queue`. On CloudLinux it is a link to a folder the host manages, so it may show as a link rather than a normal folder, and it should contain `express`.
 
-**If `node_modules` is missing or empty:** your host didn't install it. Do this instead:
+**Never upload your own `node_modules` folder or `node_modules.tar.gz`.** CloudLinux's Node.js Selector refuses to run the app if the app folder contains a real folder or file called `node_modules`, and the app then fails to start. If you have already uploaded one, delete it from `virtual-queue` in File Manager, then run **Run NPM Install** again.
 
-1. On your own computer, open a terminal in the project folder and run:
-   ```
-   npm install --omit=dev
-   ```
-2. Make an archive of the `node_modules` folder called `node_modules.tar.gz`.
-3. Upload that file into `virtual-queue`, then right-click it in File Manager and choose **Extract**.
-4. Check again that `node_modules/express` exists.
+**If `node_modules` is still missing after Run NPM Install:** contact your host rather than uploading one yourself.
 
 ---
 

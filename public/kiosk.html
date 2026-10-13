@@ -301,6 +301,8 @@
     @keyframes tileIn { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
     /* A closed tile fades in to its dimmed opacity, so the dimming doesn't pop in after the animation. */
     @keyframes tileInClosed { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 0.6; transform: none; } }
+    @keyframes tileFadeIn { from { opacity: 0.6; } to { opacity: 1; } }
+    @keyframes tileFadeOut { from { opacity: 1; } to { opacity: 0.6; } }
     /* Shown over everything while the kiosk cannot reach the server. Both languages, because nobody can pick one. */
     .offline { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 40px; text-align: center; background: var(--k-bg); color: var(--k-text); }
     .offline.hidden { display: none; }
@@ -324,6 +326,9 @@
     .step-enter { animation: stepIn 0.4s ease-out backwards; }
     .tile-enter { animation: tileIn 0.45s ease-out backwards; }
     .tile-enter.unavailable { animation-name: tileInClosed; }
+    /* A tile that opens or closes while the list is on screen fades rather than replaying the entrance. */
+    .tile.tile-fade-in { animation: tileFadeIn 0.45s ease-out; }
+    .tile.tile-fade-out { animation: tileFadeOut 0.45s ease-out; }
     @media (prefers-reduced-motion: reduce) { .step-enter, .tile-enter { animation: none; } }
 
   </style>
@@ -782,11 +787,12 @@
         $('time-error').textContent = '';
       }
 
-      function serviceTile(s, i) {
+      function serviceTile(s, i, animate) {
         var b = document.createElement('button');
         b.type = 'button';
-        b.className = 'tile tile-enter' + (s.available ? '' : ' unavailable');
-        b.style.animationDelay = (i * 60) + 'ms';
+        b.dataset.code = s.code;
+        b.className = 'tile' + (animate === false ? '' : ' tile-enter') + (s.available ? '' : ' unavailable');
+        if (animate !== false) b.style.animationDelay = (i * 60) + 'ms';
 
         var icon = document.createElement('span');
         icon.className = 'icon';
@@ -806,16 +812,34 @@
         b.appendChild(title);
         b.appendChild(desc);
         // Always tappable, even when closed: chooseService() itself decides what tapping it does.
-        b.addEventListener('click', function () { chooseService(s); });
+        // Looks the service up again on tap, so it uses the latest availability and message rather than this render's.
+        b.addEventListener('click', function () { chooseService(currentService(s.code) || s); });
         return b;
       }
 
       // Builds the service cards in the current language, in 4-3-3 rows.
       // The tiles go in the rows chosen in Service Configuration: services with the same row number share a row,
       // and the list already arrives in order within it. A service with no row yet goes on a row of its own at the end.
-      function renderServices() {
+      var renderedSig = '';
+      var renderedLayout = '';
+
+      function currentService(code) {
+        return servicesCache ? servicesCache.find(function (x) { return x.code === code; }) : null;
+      }
+
+      // What the tiles look like apart from being open or closed: which services, their rows, names and icons.
+      function layoutSignature(list) {
+        return list.map(function (s) {
+          return [s.code, s.row, s.name, s.description, s.icon, s.asksAppointment ? 1 : 0].join(':');
+        }).join('|');
+      }
+
+      // Draws every tile. The entrance animation plays only when asked for: a screen already showing the list keeps it.
+      function renderServices(animate) {
         var tiles = $('tiles');
         tiles.textContent = '';
+        renderedSig = servicesSignature(servicesCache);
+        renderedLayout = layoutSignature(servicesCache);
         var previous = null;
         servicesCache.forEach(function (s, i) {
           var row = s.row === null || s.row === undefined ? 'none' : s.row;
@@ -825,15 +849,32 @@
             tiles.appendChild(brk);
           }
           previous = row;
-          tiles.appendChild(serviceTile(s, i));
+          tiles.appendChild(serviceTile(s, i, animate));
         });
+      }
+
+      // Brings the list on screen up to date without replaying it: a tile that opened or closed fades in or out,
+      // and the others stay where they are. Only a change to the list itself (a service added, removed or moved) redraws it.
+      function refreshSelectionTiles() {
+        if (renderedLayout !== layoutSignature(servicesCache)) { renderServices(false); return; }
+        servicesCache.forEach(function (s) {
+          var b = $('tiles').querySelector('[data-code="' + s.code + '"]');
+          if (!b || (!b.classList.contains('unavailable')) === !!s.available) return;
+          b.classList.remove('tile-enter');
+          b.style.animationDelay = '';
+          b.classList.toggle('unavailable', !s.available);
+          b.classList.remove('tile-fade-in', 'tile-fade-out');
+          void b.offsetWidth; // restart the fade if it is already running
+          b.classList.add(s.available ? 'tile-fade-in' : 'tile-fade-out');
+        });
+        renderedSig = servicesSignature(servicesCache);
       }
 
       // A short fingerprint of what matters for display, so a poll/push that changes nothing
       // doesn't re-render the tiles (and restart their entrance animation) for no reason.
       function servicesSignature(list) {
         return list.map(function (s) {
-          return [s.code, s.row, s.name, s.description, s.icon, s.asksAppointment ? 1 : 0, s.available ? 1 : 0, s.unavailableMessage || ''].join(':');
+          return [s.code, s.row, s.name, s.description, s.icon, s.asksAppointment ? 1 : 0, s.available ? 1 : 0, s.unavailableMessage || '', s.reopensAt || ''].join(':');
         }).join('|');
       }
       var lastServicesSig = '';
@@ -915,11 +956,27 @@
         }).catch(function () {});
       }
 
+      // Requests can overlap (a live update and the regular check), so each one takes a number and only a newer
+      // answer than the last one used is applied: a slow, older reply must not put back what a newer one replaced.
+      var serviceLoads = 0;
+      var appliedLoad = 0;
       async function loadServices() {
+        var load = ++serviceLoads;
         try {
-          var res = await fetch(BASE + 'api/services?lang=' + encodeURIComponent(LANG), { cache: 'no-store' });
-          if (!res.ok) throw new Error('Could not load services');
-          var list = await res.json();
+          // A request that never comes back would stop the regular check, so it is given up after a while.
+          var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          var timer = controller ? setTimeout(function () { controller.abort(); }, 10000) : null;
+          var res;
+          var list;
+          try {
+            res = await fetch(BASE + 'api/services?lang=' + encodeURIComponent(LANG), { cache: 'no-store', signal: controller ? controller.signal : undefined });
+            if (!res.ok) throw new Error('Could not load services');
+            list = await res.json();
+          } finally {
+            clearTimeout(timer);
+          }
+          if (load < appliedLoad) return false;
+          appliedLoad = load;
           var sig = servicesSignature(list);
           var changed = sig !== lastServicesSig;
           servicesCache = list;
@@ -941,7 +998,14 @@
       // that, so the live updates leave it out; the regular check and a catalogue change include it.
       async function refreshServices(withLanguages) {
         var changed = await loadServices();
-        if (changed && !$('step-service').classList.contains('hidden')) renderServices();
+        // Redraws whenever the tiles on screen are not the list held, not only when this check saw a change.
+        if (!$('step-service').classList.contains('hidden') && servicesCache && servicesSignature(servicesCache) !== renderedSig) refreshSelectionTiles();
+        // A closed service's message on screen follows staff's edits; if it has reopened or gone, the list is shown instead.
+        if (changed && unavailableCode && !$('step-unavailable').classList.contains('hidden')) {
+          var shown = servicesCache.find(function (x) { return x.code === unavailableCode; });
+          if (shown && !shown.available) renderUnavailable(shown);
+          else backToServices();
+        }
         // A language switched on or off shows up on the welcome screen and the header button without a reload.
         if (withLanguages === true && await loadLanguages()) {
           renderLanguageButtons();
@@ -1086,7 +1150,18 @@
       // A closed service still responds to a tap, with a full-screen explanation, rather than
       // doing nothing — a dimmed tile alone is easy to miss, especially from a kiosk's viewing
       // distance, and this also catches the rare case where the tile was stale by a few seconds.
+      // The closed service whose message is on screen, so a change made by staff while it is open can be shown.
+      var unavailableCode = null;
+
       function showUnavailable(s) {
+        unavailableCode = s.code;
+        renderUnavailable(s);
+        show('step-unavailable');
+        // Nobody is needed to read this, so the kiosk goes back to the start on its own.
+        scheduleReset(UNAVAILABLE_MS);
+      }
+
+      function renderUnavailable(s) {
         $('unavail-name').textContent = svcName(s);
         var reopen = s.reopensAt ? new Date(s.reopensAt) : null;
         // Today's reopening shows the time alone; a later day also shows its date.
@@ -1098,9 +1173,6 @@
         }
         $('unavail-sub').textContent = t('unavailable_sub') + reopenText;
         $('unavail-message').textContent = s.unavailableMessage || '';
-        show('step-unavailable');
-        // Nobody is needed to read this, so the kiosk goes back to the start on its own.
-        scheduleReset(UNAVAILABLE_MS);
       }
 
       function chooseService(s) {

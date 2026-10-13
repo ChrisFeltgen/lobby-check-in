@@ -75,7 +75,7 @@
     /* flex:1 sizes this to exactly the space left under the header; overflow:hidden plus the JS
        auto-fit below means content that doesn't fit gets scaled down instead of causing a scroll. */
     main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 28px 28px; width: 100%; max-width: 1600px; margin: 0 auto; overflow: visible; transform-origin: top center; }
-    section { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    section { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
     .hidden { display: none !important; }
     .muted { color: var(--k-muted); }
 
@@ -191,6 +191,7 @@
     .field {
       display: flex;
       align-items: center;
+      justify-content: center;
       min-height: 8vmin;
       padding: 0 24px;
       border: 2px solid var(--k-blue);
@@ -199,6 +200,7 @@
       color: var(--k-text);
       font-size: 40px;
       word-break: break-word;
+      white-space: pre-wrap;
     }
     .field .ph { color: #9aa9b9; font-size: 34px; }
     .field .caret { width: 3px; height: 46px; background: var(--k-blue); margin-left: 2px; animation: blink 1s steps(1) infinite; }
@@ -297,6 +299,8 @@
     /* Transitions: steps fade and slide in, service cards appear in sequence. */
     @keyframes stepIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
     @keyframes tileIn { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+    /* A closed tile fades in to its dimmed opacity, so the dimming doesn't pop in after the animation. */
+    @keyframes tileInClosed { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 0.6; transform: none; } }
     /* Shown over everything while the kiosk cannot reach the server. Both languages, because nobody can pick one. */
     .offline { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 40px; text-align: center; background: var(--k-bg); color: var(--k-text); }
     .offline.hidden { display: none; }
@@ -319,6 +323,7 @@
     /* 'backwards' fill only applies before the animation starts, so the press effect on cards still works. */
     .step-enter { animation: stepIn 0.4s ease-out backwards; }
     .tile-enter { animation: tileIn 0.45s ease-out backwards; }
+    .tile-enter.unavailable { animation-name: tileInClosed; }
     @media (prefers-reduced-motion: reduce) { .step-enter, .tile-enter { animation: none; } }
 
   </style>
@@ -418,8 +423,7 @@
       <p class="unavailable-sub" id="unavail-sub"></p>
       <p class="unavailable-message" id="unavail-message"></p>
       <button class="btn-back" id="unavail-back" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-        <span data-i18n="btn_back">Back</span>
+        <span data-i18n="btn_other_service">Choose another service</span>
       </button>
     </section>
   </main>
@@ -463,6 +467,7 @@
       }
       // Set from Management → Settings → Kiosk configuration before the first screen is shown (see the end of this script).
       var IDLE_MS, DONE_MS;
+      var UNAVAILABLE_MS = 20000; // How long a closed-service message stays up before the kiosk returns to the start.
 
       var LANG = 'en';
       var servicesCache = null;
@@ -647,11 +652,6 @@
         box.textContent = '';
         if (name) {
           box.appendChild(document.createTextNode(name));
-        } else {
-          var ph = document.createElement('span');
-          ph.className = 'ph';
-          ph.textContent = t(stage === 'host' ? 'ph_host' : 'ph_name');
-          box.appendChild(ph);
         }
         var caret = document.createElement('span');
         caret.className = 'caret';
@@ -742,7 +742,36 @@
           box.appendChild(wrap);
         });
         $('time-continue').disabled = true;
+        refreshSlotAvailability();
       }
+
+      // Minutes after midnight for a slot label such as "7:30 AM".
+      function slotMinutes(time) {
+        var m = /^(\d+):(\d+) (AM|PM)$/.exec(time);
+        return (Number(m[1]) % 12 + (m[3] === 'PM' ? 12 : 0)) * 60 + Number(m[2]);
+      }
+
+      // A slot can be booked until 30 minutes after it starts, then it is closed.
+      function slotIsPast(time) {
+        var now = new Date();
+        var minutesNow = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        return minutesNow - slotMinutes(time) > 30;
+      }
+
+      // Closes the slots whose 30 minutes have passed, and drops a selection that just closed.
+      // Runs every 30 seconds, so a screen left open on the time step keeps up.
+      function refreshSlotAvailability() {
+        $('time-grid').querySelectorAll('.time-slot').forEach(function (b) {
+          var past = slotIsPast(b.textContent);
+          b.disabled = past;
+          if (past && b.textContent === apptTime) {
+            apptTime = '';
+            b.classList.remove('selected');
+            $('time-continue').disabled = true;
+          }
+        });
+      }
+      setInterval(refreshSlotAvailability, 30000);
 
       function selectTime(time) {
         apptTime = time;
@@ -1059,10 +1088,19 @@
       // distance, and this also catches the rare case where the tile was stale by a few seconds.
       function showUnavailable(s) {
         $('unavail-name').textContent = svcName(s);
-        $('unavail-sub').textContent = t('unavailable_sub');
+        var reopen = s.reopensAt ? new Date(s.reopensAt) : null;
+        // Today's reopening shows the time alone; a later day also shows its date.
+        var reopenText = '';
+        if (reopen) {
+          var laterDay = reopen.toDateString() !== new Date().toDateString();
+          var parts = laterDay ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' } : { hour: 'numeric', minute: '2-digit' };
+          reopenText = ' ' + t('reopens_at') + ' ' + reopen.toLocaleString(LANG, parts);
+        }
+        $('unavail-sub').textContent = t('unavailable_sub') + reopenText;
         $('unavail-message').textContent = s.unavailableMessage || '';
         show('step-unavailable');
-        scheduleReset(IDLE_MS);
+        // Nobody is needed to read this, so the kiosk goes back to the start on its own.
+        scheduleReset(UNAVAILABLE_MS);
       }
 
       function chooseService(s) {
@@ -1149,7 +1187,7 @@
         } finally {
           busy = false;
           $('submit').disabled = false;
-          $('time-grid').querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+          refreshSlotAvailability();
         }
       }
 

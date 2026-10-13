@@ -35,7 +35,7 @@ test('"last" means the final occurrence of that weekday in the month', () => {
 
 test('a manual closure overrides being open', () => {
   const result = resolveAvailability({ manual_override: 'closed', manual_message: 'Hearing', manual_override_expires_at: null }, [], wed(14, 9, 0));
-  assert.deepEqual(result, { available: false, message: 'Hearing', source: 'manual' });
+  assert.deepEqual(result, { available: false, message: 'Hearing', source: 'manual', reopensAt: null });
 });
 
 test('a manual reopen overrides an active recurring closure', () => {
@@ -51,7 +51,7 @@ test('a manual closure with a reopen time stops applying after that time', () =>
 
 test('a recurring closure is reported with its message and schedule', () => {
   const result = resolveAvailability({ manual_override: 'none' }, [weekly], wed(14, 13, 0));
-  assert.deepEqual(result, { available: false, message: 'Closed for training', source: 'schedule', scheduleId: 1 });
+  assert.deepEqual(result, { available: false, message: 'Closed for training', source: 'schedule', scheduleId: 1, reopensAt: new Date(2026, 9, 14, 16, 0) });
 });
 
 test('with nothing set, the service is open', () => {

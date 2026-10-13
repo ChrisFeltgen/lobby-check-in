@@ -112,6 +112,20 @@
     .status-pill { font-size: 12px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
     .status-open { background: #dcf3e3; color: #166a37; }
     .status-closed { background: #fdf0d5; color: #9a5b00; }
+    .svc-card.is-closed .status-closed { background: color-mix(in srgb, var(--danger) 16%, var(--card)); color: var(--danger); }
+    .svc-lead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .closed-icon { flex: none; width: 44px; height: 44px; border-radius: 12px; background: color-mix(in srgb, var(--danger) 14%, var(--card)); color: var(--danger); display: flex; align-items: center; justify-content: center; }
+    .closed-icon svg { width: 28px; height: 28px; }
+    .closed-sub { font-size: 14px; color: var(--danger); margin-top: 2px; }
+    .closure-reason { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+    .cr-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); }
+    .cr-text { font-size: 16px; margin-top: 2px; }
+    .reopen-row { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+    .reopen-row strong { display: block; font-size: 15px; }
+    .reopen-icon { flex: none; color: var(--muted); display: flex; }
+    .reopen-icon svg { width: 30px; height: 30px; }
+    .reopen-until { font-size: 14px; color: var(--muted); }
+    .svc-actions button svg { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
     .current-reason { margin: 8px 0 0; font-size: 14px; color: #9a5b00; }
 
     .override-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -171,6 +185,7 @@
     .svc-sched { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
     .svc-sched.hidden { display: none; }
     .closed-banner { font-size: 14px; line-height: 1.4; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--danger) 12%, var(--card)); color: var(--danger); }
+    .closed-reopen { font-size: 13px; color: var(--muted); padding: 0 4px; }
     .override-row { margin-top: 0; }
     .health-ok { font-weight: 600; color: #2e9e5b; margin: 0 0 8px; }
     .settings-group { display: flex; flex-direction: column; gap: 10px; }
@@ -667,6 +682,43 @@
         return api('/api/services/' + code + '/override', { method: 'PATCH', body: JSON.stringify(body) });
       }
 
+      // A reopen time as the text a manager reads, such as "Mon, Oct 19, 7:00 AM".
+      function formatReopen(iso) {
+        var when = new Date(iso);
+        return when.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' at ' +
+          when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      }
+
+      // How far away a reopen time is, such as "in 6 days" or "in 3 hours".
+      function untilText(iso) {
+        var mins = Math.round((new Date(iso) - Date.now()) / 60000);
+        if (mins <= 0) return 'now';
+        if (mins < 60) return 'in ' + mins + (mins === 1 ? ' minute' : ' minutes');
+        var hours = Math.round(mins / 60);
+        if (hours < 24) return 'in ' + hours + (hours === 1 ? ' hour' : ' hours');
+        var days = Math.round(hours / 24);
+        return 'in ' + days + (days === 1 ? ' day' : ' days');
+      }
+
+      // The reopen time of a manual closure: a calendar icon, the date and time, and how long until then.
+      function reopenRow(iso) {
+        var row = el('div', 'reopen-row');
+        var icon = el('span', 'reopen-icon');
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="17" cy="17" r="5"/><path d="M17 15v2l1.5 1"/></svg>';
+        var text = el('div');
+        text.appendChild(el('strong', null, 'Reopens ' + formatReopen(iso)));
+        text.appendChild(el('span', 'reopen-until', '(' + untilText(iso) + ')'));
+        row.appendChild(icon);
+        row.appendChild(text);
+        return row;
+      }
+
+      // A date as the value a datetime-local input takes, in this computer's time.
+      function toDatetimeLocal(d) {
+        function two(n) { return String(n).padStart(2, '0'); }
+        return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + 'T' + two(d.getHours()) + ':' + two(d.getMinutes());
+      }
+
       function openCloseForm(container, svc) {
         container.textContent = '';
         var form = el('form', 'inline-form');
@@ -680,6 +732,7 @@
 
         var until = document.createElement('input');
         until.type = 'datetime-local';
+        if (svc.manualOverride === 'closed' && svc.manualOverrideExpiresAt) until.value = toDatetimeLocal(new Date(svc.manualOverrideExpiresAt));
         form.appendChild(labelled('Reopens automatically at (optional)', until));
 
         var err = el('p', 'err');
@@ -687,7 +740,7 @@
         var cancel = el('button', 'secondary', 'Cancel');
         cancel.type = 'button';
         cancel.addEventListener('click', function () { container.textContent = ''; });
-        var confirmBtn = el('button', 'primary', 'Close this service');
+        var confirmBtn = el('button', 'primary', svc.manualOverride === 'closed' ? 'Save closure' : 'Close this service');
         confirmBtn.type = 'submit';
         actions.appendChild(cancel);
         actions.appendChild(confirmBtn);
@@ -857,9 +910,24 @@
         head.appendChild(el('span', 'status-pill ' + (svc.available ? 'status-open' : 'status-closed'), svc.available ? 'Open' : 'Closed'));
         panel.appendChild(head);
 
-        if (!svc.available) {
-          var sourceLabel = svc.source === 'manual' ? ' (closed manually)' : svc.source === 'schedule' ? ' (recurring closure)' : '';
+        if (!svc.available && svc.source === 'manual') {
+          // Closed by hand: a red icon and "Manually closed" beside the name, then the reason and the reopen time.
+          var lead = el('div', 'svc-lead');
+          var closedIcon = el('span', 'closed-icon');
+          closedIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M8 12h8" stroke="#fff"/></svg>';
+          head.insertBefore(lead, titles);
+          lead.appendChild(closedIcon);
+          lead.appendChild(titles);
+          titles.appendChild(el('div', 'closed-sub', 'Manually closed'));
+          var reason = el('div', 'closure-reason');
+          reason.appendChild(el('div', 'cr-label', 'Closure reason'));
+          reason.appendChild(el('div', 'cr-text', svc.currentMessage));
+          panel.appendChild(reason);
+          if (svc.reopensAt) panel.appendChild(reopenRow(svc.reopensAt));
+        } else if (!svc.available) {
+          var sourceLabel = svc.source === 'schedule' ? ' (recurring closure)' : '';
           panel.appendChild(el('div', 'closed-banner', svc.currentMessage + sourceLabel));
+          if (svc.reopensAt) panel.appendChild(el('div', 'closed-reopen', 'Scheduled to reopen ' + formatReopen(svc.reopensAt)));
         }
 
         var formContainer = el('div');
@@ -890,7 +958,11 @@
             function () { openCloseForm(formContainer, svc); });
           caption = 'Open now opens it only until the scheduled closure ends. Keep closed holds it shut until you reopen it.';
         } else {
-          actionButton('Reopen', 'primary', 'Lifts the manual closure. Recurring closures apply again.', runOverride('open'));
+          actionButton('Reopen now', 'primary', 'Lifts the manual closure. Recurring closures apply again.', runOverride('open'));
+          actionButton('Edit closure', 'secondary', 'Change the reason customers see, or when it reopens.',
+            function () { openCloseForm(formContainer, svc); });
+          actions.children[0].insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>');
+          actions.children[1].insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>');
         }
         // Only worth offering when an override is in place and isn't already the manual closure above.
         if (svc.manualOverride !== 'none' && !closedManually) {
@@ -902,7 +974,9 @@
         var toggle = el('button', 'secondary sched-toggle' + (svc.schedules.length ? ' has-schedules' : ''));
         toggle.type = 'button';
         function toggleLabel() {
-          toggle.textContent = 'Recurring closures' + (svc.schedules.length ? ' (' + svc.schedules.length + ')' : '') + (sched.classList.contains('hidden') ? ' ▾' : ' ▴');
+          var n = svc.schedules.length;
+          var name = closedManually && n ? n + (n === 1 ? ' recurring schedule' : ' recurring schedules') : 'Recurring closures' + (n ? ' (' + n + ')' : '');
+          toggle.textContent = name + (sched.classList.contains('hidden') ? ' ▾' : ' ▴');
           toggle.setAttribute('aria-expanded', sched.classList.contains('hidden') ? 'false' : 'true');
         }
         toggle.addEventListener('click', function () {

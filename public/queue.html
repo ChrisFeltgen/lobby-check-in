@@ -457,6 +457,7 @@
         if (!res.ok) {
           var failure = new Error(res.status >= 500 ? 'The server had a problem. Try again in a moment.' : (data.error || 'Request failed (' + res.status + ')'));
           failure.auth = res.status === 401;
+          failure.data = data;
           throw failure;
         }
         return data;
@@ -882,6 +883,18 @@
         return l;
       }
 
+      // Why a closed service refused a customer: how it was closed, the reason, and when it reopens if that is set.
+      function closedServiceNote(name, data) {
+        var how = data.source === 'manual' ? ' by hand' : data.source === 'schedule' ? ' on a recurring schedule' : '';
+        var text = name + ' is closed' + how + '. Reason: ' + data.error;
+        if (data.reopensAt) {
+          var when = new Date(data.reopensAt);
+          text += '. Reopens ' + when.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' at ' +
+            when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        }
+        return text + '.';
+      }
+
       function openAddCustomer() {
         closeMenu();
         var overlay = el('div', 'overlay');
@@ -952,7 +965,12 @@
           add.disabled = true;
           api('/api/tickets', { method: 'POST', body: JSON.stringify(body) })
             .then(function () { overlay.remove(); refresh(); })
-            .catch(function (error) { err.textContent = error.message; add.disabled = false; });
+            .catch(function (error) {
+              err.textContent = error.data && error.data.reopensAt !== undefined
+                ? closedServiceNote(serviceSel.options[serviceSel.selectedIndex].text, error.data)
+                : error.message;
+              add.disabled = false;
+            });
         });
 
         overlay.appendChild(form);

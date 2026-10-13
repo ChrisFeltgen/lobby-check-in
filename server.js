@@ -530,7 +530,14 @@ app.post('/api/tickets', screenAccess('kiosk'), wrap(async (req, res) => {
 
   const availability = await db.getServiceAvailability(serviceId);
   if (!availability) return res.status(404).json({ error: 'That service is not available' });
-  if (!availability.available) return res.status(409).json({ error: availability.message });
+  if (!availability.available) {
+    // The source and reopen time let the staff portal say why, and when, the service reopens.
+    return res.status(409).json({
+      error: availability.message,
+      source: availability.source,
+      reopensAt: availability.reopensAt ? availability.reopensAt.toISOString() : null,
+    });
+  }
 
   let appointment = null;
   if (availability.asksAppointment) {

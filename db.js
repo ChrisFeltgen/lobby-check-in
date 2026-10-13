@@ -213,6 +213,7 @@ async function listServices(lang) {
     pinned: !!s.pinned,
     available: avail[s.code] ? avail[s.code].available : true,
     unavailableMessage: avail[s.code] && !avail[s.code].available ? avail[s.code].message : null,
+    reopensAt: avail[s.code] && avail[s.code].reopensAt ? avail[s.code].reopensAt.toISOString() : null,
   }));
 }
 
@@ -994,6 +995,7 @@ async function listServicesAdmin() {
       available: availability.available,
       currentMessage: availability.available ? null : availability.message,
       source: availability.source,
+      reopensAt: availability.reopensAt ? availability.reopensAt.toISOString() : null,
       schedules: mine.map(toSchedule),
     };
   });

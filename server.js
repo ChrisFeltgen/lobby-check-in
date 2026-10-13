@@ -983,7 +983,19 @@ app.get('/api/admin/health', requireRole('admin'), wrap(async (req, res) => {
 }));
 
 app.get('/api/admin/database', requireRole('admin'), wrap(async (req, res) => {
-  res.json({ checks: await db.databaseCheck() });
+  const checks = await db.databaseCheck();
+  // Not a database matter, but it is the first thing to look at when staff are signed out after a restart.
+  const secret = process.env.SESSION_SECRET || '';
+  checks.push({
+    name: 'Session secret',
+    ok: secret.length >= 32,
+    detail: !secret
+      ? 'Not set: staff are signed out on every restart. Set SESSION_SECRET in the app\'s environment settings.'
+      : secret.length < 32
+        ? 'Set, but shorter than 32 characters. Use a longer random value.'
+        : 'Set',
+  });
+  res.json({ checks });
 }));
 
 app.get('/api/admin/settings', requireRole('admin'), wrap(async (req, res) => {
